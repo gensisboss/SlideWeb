@@ -44,10 +44,34 @@
         let goal = 2;
         let gameOver = false;
         let isMoving = false;
+        let isTransitioning = false;
         let turnState = TURN_STATE.IDLE;
 
         const gridContainer = document.getElementById('gridContainer');
+        const startScreen = document.getElementById('startScreen');
+        const startGameBtn = document.getElementById('startGameBtn');
+        const openEditorBtn = document.getElementById('openEditorBtn');
+        const gameScene = document.getElementById('gameScene');
+        const editorScene = document.getElementById('editorScene');
+        const editorGrid = document.getElementById('editorGrid');
+        const editorCategoryTabs = document.getElementById('editorCategoryTabs');
+        const editorPalette = document.getElementById('editorPalette');
+        const editorMessage = document.getElementById('editorMessage');
+        const editorLevelInput = document.getElementById('editorLevelInput');
+        const editorRowsInput = document.getElementById('editorRowsInput');
+        const editorColsInput = document.getElementById('editorColsInput');
+        const editorResizeBtn = document.getElementById('editorResizeBtn');
+        const editorExportPanel = document.getElementById('editorExportPanel');
+        const editorJsonOutput = document.getElementById('editorJsonOutput');
+        const editorCopyJsonBtn = document.getElementById('editorCopyJsonBtn');
+        const editorPlayBtn = document.getElementById('editorPlayBtn');
+        const editorSaveBtn = document.getElementById('editorSaveBtn');
+        const editorClearBtn = document.getElementById('editorClearBtn');
+        const editorHomeBtn = document.getElementById('editorHomeBtn');
+        const levelLoading = document.getElementById('levelLoading');
+        const homeBtn = document.getElementById('homeBtn');
         const levelDisplay = document.getElementById('levelDisplay');
+        const seasonDisplay = document.getElementById('seasonDisplay');
         const sheepCountSpan = document.getElementById('sheepCount');
         const wolfCountSpan = document.getElementById('wolfCount');
         const goalDisplay = document.getElementById('goalDisplay');
@@ -56,6 +80,95 @@
         const modalTitle = document.getElementById('modalTitle');
         const modalMessage = document.getElementById('modalMessage');
         const modalResetBtn = document.getElementById('modalResetBtn');
+        const modalNextBtn = document.getElementById('modalNextBtn');
+        const modalHomeBtn = document.getElementById('modalHomeBtn');
+
+        const SEASON_TERMS = [
+            '立春', '雨水', '惊蛰', '春分', '清明', '谷雨',
+            '立夏', '小满', '芒种', '夏至', '小暑', '大暑',
+            '立秋', '处暑', '白露', '秋分', '寒露', '霜降',
+            '立冬', '小雪', '大雪', '冬至', '小寒', '大寒'
+        ];
+
+        const SPRITE_VARIANTS = {
+            sheep: ['sheep.png', 'sheep-2.png', 'sheep-3.png', 'sheep-4.png', 'sheep-5.png'],
+            wolf: ['wolf.png', 'wolf-2.png', 'wolf-3.png', 'wolf-4.png', 'wolf-5.png'],
+            village: ['village.png', 'village-2.png', 'village-3.png', 'village-4.png'],
+            obstacle: ['obstacle.png', 'obstacle-2.png', 'obstacle-3.png', 'obstacle-4.png'],
+            trap: ['trap.png', 'trap-2.png', 'trap-3.png', 'trap-4.png']
+        };
+
+        const SPRITE_BASE = 'assets/hujian-tulou/';
+        const CUSTOM_LEVELS_URL = 'data/custom-levels.json';
+        const DEFAULT_EDITOR_ROWS = 6;
+        const DEFAULT_EDITOR_COLS = 6;
+        const MIN_EDITOR_SIZE = 1;
+        const MAX_EDITOR_SIZE = 10;
+        const editorCore = window.LevelEditorCore;
+        const editorToolGroups = [
+            { key: 'erase', label: '擦除', tools: [{ label: '擦除', id: 0, className: 'erase' }] },
+            {
+                key: 'sheep',
+                label: '小羊',
+                tools: [
+                    { label: '羊1', id: SHEEP_IDS[0] },
+                    { label: '羊2', id: SHEEP_IDS[1] },
+                    { label: '羊3', id: SHEEP_IDS[2] },
+                    { label: '羊4', id: SHEEP_IDS[3] },
+                    { label: '羊5', id: SHEEP_IDS[4] }
+                ]
+            },
+            {
+                key: 'wolf',
+                label: '狼',
+                tools: [
+                    { label: '狼1', id: WOLF_IDS[0] },
+                    { label: '狼2', id: WOLF_IDS[1] },
+                    { label: '狼3', id: WOLF_IDS[2] },
+                    { label: '狼4', id: WOLF_IDS[3] },
+                    { label: '狼5', id: WOLF_IDS[4] }
+                ]
+            },
+            {
+                key: 'village',
+                label: '羊村',
+                tools: [
+                    { label: '羊村1', id: VILLAGE_IDS[0] },
+                    { label: '羊村2', id: VILLAGE_IDS[1] },
+                    { label: '羊村3', id: VILLAGE_IDS[2] },
+                    { label: '羊村4', id: VILLAGE_IDS[3] }
+                ]
+            },
+            {
+                key: 'obstacle',
+                label: '障碍',
+                tools: [
+                    { label: '障碍1', id: OBSTACLE_IDS[0] },
+                    { label: '障碍2', id: OBSTACLE_IDS[1] },
+                    { label: '障碍3', id: OBSTACLE_IDS[2] },
+                    { label: '障碍4', id: OBSTACLE_IDS[3] }
+                ]
+            },
+            {
+                key: 'trap',
+                label: '陷阱',
+                tools: [
+                    { label: '陷阱1', id: TRAP_IDS[0] },
+                    { label: '陷阱2', id: TRAP_IDS[1] },
+                    { label: '陷阱3', id: TRAP_IDS[2] },
+                    { label: '陷阱4', id: TRAP_IDS[3] }
+                ]
+            }
+        ];
+        let editorRows = DEFAULT_EDITOR_ROWS;
+        let editorCols = DEFAULT_EDITOR_COLS;
+        let editorMap = editorCore.createEmptyMap(editorRows, editorCols);
+        let selectedEditorId = SHEEP_IDS[0];
+        let selectedEditorGroup = 'sheep';
+        let levelMaps = [];
+        let levelsReady = false;
+        let pendingLevelSave = null;
+        let modalMode = 'game';
 
         const DIR = {
             'up': [-1, 0],
@@ -108,20 +221,423 @@
             return currentLevel + 1 >= MOVING_OBSTACLE_START_LEVEL;
         }
 
-        function showGameModal(title, message) {
+        function showGameModal(title, message, options = {}) {
             if (!gameModal) return;
+            const { showNext = false, resetLabel = '重玩本关', homeLabel = '返回开始页', mode = 'game' } = options;
+            modalMode = mode;
             modalTitle.textContent = title;
             modalMessage.textContent = message;
+            if (modalResetBtn) {
+                modalResetBtn.setAttribute('aria-label', resetLabel);
+                modalResetBtn.title = resetLabel;
+            }
+            if (modalHomeBtn) {
+                modalHomeBtn.setAttribute('aria-label', homeLabel);
+                modalHomeBtn.title = homeLabel;
+            }
+            if (modalNextBtn) {
+                modalNextBtn.classList.toggle('hidden', !showNext);
+            }
             gameModal.classList.remove('hidden');
         }
 
         function hideGameModal() {
             if (!gameModal) return;
             gameModal.classList.add('hidden');
+            modalMode = 'game';
         }
 
-        function wait(ms) {
-            return new Promise(resolve => setTimeout(resolve, ms));
+        function showStartScreen() {
+            hideGameModal();
+            if (startScreen) startScreen.classList.remove('is-hidden');
+            if (gameScene) gameScene.classList.add('is-hidden');
+            if (editorScene) editorScene.classList.add('is-hidden');
+        }
+
+        function showGameScene() {
+            hideGameModal();
+            if (startScreen) startScreen.classList.add('is-hidden');
+            if (gameScene) gameScene.classList.remove('is-hidden');
+            if (editorScene) editorScene.classList.add('is-hidden');
+        }
+
+        function showEditorScene() {
+            hideGameModal();
+            if (startScreen) startScreen.classList.add('is-hidden');
+            if (gameScene) gameScene.classList.add('is-hidden');
+            if (editorScene) editorScene.classList.remove('is-hidden');
+            renderEditor();
+        }
+
+        async function startGame() {
+            if (!levelsReady || LEVEL_CONFIGS.length === 0) {
+                showGameModal('需要关卡数据', '没有读取到关卡 JSON，请先进入关卡编辑并生成关卡数据。', {
+                    mode: 'missingLevels',
+                    resetLabel: '去编辑',
+                    homeLabel: '返回首页'
+                });
+                return;
+            }
+            showGameScene();
+            await transitionToLevel(currentLevel);
+        }
+
+        function goHome() {
+            if (isMoving || isTransitioning) return;
+            currentLevel = 0;
+            if (levelsReady && LEVEL_CONFIGS.length) {
+                loadLevel(currentLevel);
+            }
+            showStartScreen();
+        }
+
+        function handleModalHome() {
+            if (modalMode === 'confirmOverwrite') {
+                pendingLevelSave = null;
+                hideGameModal();
+                showEditorScene();
+                setEditorMessage('已取消覆盖');
+                return;
+            }
+            goHome();
+        }
+
+        function handleModalReset() {
+            if (modalMode === 'confirmOverwrite') {
+                if (pendingLevelSave) {
+                    finalizeEditorLevelSave(pendingLevelSave.plan, pendingLevelSave.map);
+                }
+                hideGameModal();
+                showEditorScene();
+                return;
+            }
+            if (modalMode === 'missingLevels') {
+                hideGameModal();
+                showEditorScene();
+                return;
+            }
+            resetLevel();
+        }
+
+        async function goNextLevel() {
+            if (isMoving || isTransitioning) return;
+            if (currentLevel < LEVEL_CONFIGS.length - 1) {
+                showGameScene();
+                await transitionToLevel(currentLevel + 1);
+            } else {
+                showGameModal('狼来了通关', '小羊都走过了山路，回到首页可以重新开始。');
+            }
+        }
+
+        function playLevelLoading(onCovered) {
+            return new Promise(resolve => {
+                if (!levelLoading) {
+                    onCovered();
+                    resolve();
+                    return;
+                }
+
+                levelLoading.classList.remove('hidden');
+                levelLoading.classList.remove('is-playing');
+                void levelLoading.offsetWidth;
+                levelLoading.classList.add('is-playing');
+
+                setTimeout(onCovered, 430);
+                setTimeout(() => {
+                    levelLoading.classList.remove('is-playing');
+                    levelLoading.classList.add('hidden');
+                    resolve();
+                }, 1180);
+            });
+        }
+
+        async function transitionToLevel(index) {
+            if (isMoving || isTransitioning) return;
+            isTransitioning = true;
+            setTurnState(TURN_STATE.ANIMATE);
+            hideGameModal();
+            await playLevelLoading(() => {
+                currentLevel = index;
+                loadLevel(currentLevel);
+            });
+            setTurnState(TURN_STATE.IDLE);
+            isTransitioning = false;
+        }
+
+        function mapToLevel(map) {
+            const sheepTotal = map.flat().filter(id => SHEEP_IDS.includes(id)).length;
+            return editorCore.buildLevelFromMap(map, Math.max(1, sheepTotal));
+        }
+
+        function applyLevelMaps(maps) {
+            levelMaps = editorCore.normalizeLevelMaps(maps);
+            LEVEL_CONFIGS.length = 0;
+            LEVEL_CONFIGS.push(...levelMaps.map(mapToLevel));
+            levelsReady = levelMaps.length > 0;
+            currentLevel = levelsReady ? Math.min(currentLevel, LEVEL_CONFIGS.length - 1) : 0;
+            return levelsReady;
+        }
+
+        async function loadCustomLevelMaps() {
+            try {
+                const response = await fetch(`${CUSTOM_LEVELS_URL}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!response.ok) return applyLevelMaps([]);
+                return applyLevelMaps(await response.json());
+            } catch {
+                return applyLevelMaps([]);
+            }
+        }
+
+        function exportCurrentLevelMaps(messageLevelNumber) {
+            if (!editorJsonOutput || !editorExportPanel) return;
+            editorJsonOutput.value = editorCore.exportLevelMapsJson(levelMaps);
+            editorExportPanel.classList.remove('hidden');
+            setEditorMessage(`已生成二维数组 JSON，请复制覆盖 ${CUSTOM_LEVELS_URL}（第 ${messageLevelNumber} 关）`);
+        }
+
+        function finalizeEditorLevelSave(plan, map) {
+            levelMaps = editorCore.applyLevelMapSave(levelMaps, plan.targetLevelNumber, map);
+            LEVEL_CONFIGS.length = 0;
+            LEVEL_CONFIGS.push(...levelMaps.map(mapToLevel));
+            levelsReady = LEVEL_CONFIGS.length > 0;
+            currentLevel = Math.min(currentLevel, LEVEL_CONFIGS.length - 1);
+            exportCurrentLevelMaps(plan.targetLevelNumber);
+            pendingLevelSave = null;
+        }
+
+        function getEntityClassForId(id) {
+            if (SHEEP_IDS.includes(id)) return 'entity-sheep';
+            if (WOLF_IDS.includes(id)) return 'entity-wolf';
+            if (OBSTACLE_IDS.includes(id)) return 'entity-obstacle';
+            if (TRAP_IDS.includes(id)) return 'entity-trap';
+            if (VILLAGE_IDS.includes(id)) return 'entity-village';
+            return 'terrain-clear';
+        }
+
+        function getEntityKindForId(id) {
+            if (SHEEP_IDS.includes(id)) return 'sheep';
+            if (WOLF_IDS.includes(id)) return 'wolf';
+            if (OBSTACLE_IDS.includes(id)) return 'obstacle';
+            if (TRAP_IDS.includes(id)) return 'trap';
+            if (VILLAGE_IDS.includes(id)) return 'village';
+            return null;
+        }
+
+        function getSpriteForId(id) {
+            const kind = getEntityKindForId(id);
+            const variants = kind ? SPRITE_VARIANTS[kind] : null;
+            if (!variants) return '';
+            const idGroups = {
+                sheep: SHEEP_IDS,
+                wolf: WOLF_IDS,
+                obstacle: OBSTACLE_IDS,
+                trap: TRAP_IDS,
+                village: VILLAGE_IDS
+            };
+            const idIndex = idGroups[kind].indexOf(id);
+            const index = (idIndex >= 0 ? idIndex : Math.abs(Number(id) || 0)) % variants.length;
+            return `${SPRITE_BASE}${variants[index]}`;
+        }
+
+        function applySpriteStyle(el, id) {
+            const sprite = getSpriteForId(id);
+            if (!sprite) return;
+            el.style.setProperty('--entity-sprite', `url("../${sprite}")`);
+        }
+
+        function getEditorGoal() {
+            const sheepTotal = editorMap.flat().filter(id => SHEEP_IDS.includes(id)).length;
+            return Math.max(1, sheepTotal);
+        }
+
+        function getEditorLevelNumber() {
+            const fallback = currentLevel + 1;
+            const value = Number(editorLevelInput?.value || fallback);
+            const levelNumber = Math.max(1, Number.isFinite(value) ? Math.floor(value) : fallback);
+            if (editorLevelInput) editorLevelInput.value = String(levelNumber);
+            return levelNumber;
+        }
+
+        function clampEditorSize(value, fallback) {
+            const number = Number(value);
+            const normalized = Number.isFinite(number) ? Math.floor(number) : fallback;
+            return Math.min(MAX_EDITOR_SIZE, Math.max(MIN_EDITOR_SIZE, normalized));
+        }
+
+        function syncEditorSizeInputs() {
+            if (editorRowsInput) editorRowsInput.value = String(editorRows);
+            if (editorColsInput) editorColsInput.value = String(editorCols);
+        }
+
+        function getEditorSizeFromInputs() {
+            return {
+                rows: clampEditorSize(editorRowsInput?.value, editorRows),
+                cols: clampEditorSize(editorColsInput?.value, editorCols)
+            };
+        }
+
+        function setEditorMessage(text) {
+            if (editorMessage) editorMessage.textContent = text;
+        }
+
+        function getActiveEditorGroup() {
+            return editorToolGroups.find(group => group.key === selectedEditorGroup) || editorToolGroups[0];
+        }
+
+        function renderEditorCategoryTabs() {
+            if (!editorCategoryTabs) return;
+            editorCategoryTabs.innerHTML = '';
+            editorToolGroups.forEach(group => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'editor-category-btn';
+                button.textContent = group.label;
+                button.setAttribute('aria-label', `显示${group.label}素材`);
+                button.classList.toggle('is-active', selectedEditorGroup === group.key);
+                button.addEventListener('click', () => {
+                    selectedEditorGroup = group.key;
+                    selectedEditorId = group.tools[0].id;
+                    renderEditorCategoryTabs();
+                    renderEditorPalette();
+                    setEditorMessage(`已切换：${group.label}`);
+                });
+                editorCategoryTabs.appendChild(button);
+            });
+        }
+
+        function renderEditorPalette() {
+            if (!editorPalette) return;
+            editorPalette.innerHTML = '';
+            getActiveEditorGroup().tools.forEach(tool => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = `palette-btn ${tool.className || ''}`;
+                button.setAttribute('aria-label', tool.label);
+                button.classList.toggle('is-active', selectedEditorId === tool.id);
+                if (tool.id) {
+                    applySpriteStyle(button, tool.id);
+                }
+                button.addEventListener('click', () => {
+                    selectedEditorId = tool.id;
+                    renderEditorPalette();
+                    setEditorMessage(tool.id ? `已选择：${tool.label}` : '已选择：擦除');
+                });
+                editorPalette.appendChild(button);
+            });
+        }
+
+        function renderEditor() {
+            if (!editorGrid) return;
+            editorGrid.style.gridTemplateColumns = `repeat(${editorCols}, var(--cell-size))`;
+            editorGrid.style.setProperty('--rows', editorRows);
+            editorGrid.style.setProperty('--cols', editorCols);
+            editorGrid.innerHTML = '';
+            for (let r = 0; r < editorRows; r++) {
+                for (let c = 0; c < editorCols; c++) {
+                    const id = editorMap[r][c];
+                    const cell = document.createElement('button');
+                    cell.type = 'button';
+                    cell.dataset.row = r;
+                    cell.dataset.col = c;
+                    cell.className = `cell ${getEntityClassForId(id)}`;
+                    cell.setAttribute('aria-label', `第 ${r + 1} 行第 ${c + 1} 列`);
+                    applySpriteStyle(cell, id);
+                    if (OBSTACLE_IDS.includes(id)) cell.classList.add('obstacle');
+                    if (TRAP_IDS.includes(id)) cell.classList.add('trap');
+                    if (VILLAGE_IDS.includes(id)) cell.classList.add('sheep-village');
+                    cell.innerHTML = `<span class="emoji">${getEmojiForId(id)}</span>`;
+                    cell.addEventListener('click', () => {
+                        editorMap = editorCore.placeTile(editorMap, r, c, selectedEditorId);
+                        renderEditor();
+                    });
+                    editorGrid.appendChild(cell);
+                }
+            }
+            syncEditorSizeInputs();
+            renderEditorCategoryTabs();
+            renderEditorPalette();
+        }
+
+        function buildEditorLevel() {
+            return editorCore.buildLevelFromMap(editorMap, getEditorGoal());
+        }
+
+        async function playEditorLevel() {
+            if (isMoving || isTransitioning) return;
+            const level = buildEditorLevel();
+            levelMaps = [editorMap.map(row => [...row])];
+            LEVEL_CONFIGS.length = 0;
+            LEVEL_CONFIGS.push(level);
+            levelsReady = true;
+            await transitionToLevel(0);
+            showGameScene();
+        }
+
+        function saveEditorLevel() {
+            const levelNumber = getEditorLevelNumber();
+            const plan = editorCore.planLevelMapSave(levelMaps, levelNumber);
+            const map = editorMap.map(row => [...row]);
+            if (plan.requiresConfirmation) {
+                pendingLevelSave = { plan, map };
+                showGameModal(
+                    '覆盖关卡数据',
+                    `JSON 中已经有第 ${plan.targetLevelNumber} 关，确认覆盖这关数据吗？`,
+                    { mode: 'confirmOverwrite', resetLabel: '确认覆盖', homeLabel: '取消' }
+                );
+                return;
+            }
+            finalizeEditorLevelSave(plan, map);
+        }
+
+        function clearEditorMap() {
+            editorMap = editorCore.createEmptyMap(editorRows, editorCols);
+            renderEditor();
+            setEditorMessage('已清空地图');
+        }
+
+        function resizeEditorMapFromInputs() {
+            const nextSize = getEditorSizeFromInputs();
+            editorRows = nextSize.rows;
+            editorCols = nextSize.cols;
+            editorMap = editorCore.resizeMap(editorMap, editorRows, editorCols);
+            renderEditor();
+            setEditorMessage(`已生成 ${editorRows} 行 × ${editorCols} 列地图`);
+        }
+
+        async function copyEditorJson() {
+            if (!editorJsonOutput || !editorJsonOutput.value) {
+                setEditorMessage('请先保存生成 JSON');
+                return;
+            }
+
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(editorJsonOutput.value);
+                } else {
+                    editorJsonOutput.select();
+                    document.execCommand('copy');
+                }
+                setEditorMessage('关卡 JSON 已复制');
+            } catch {
+                editorJsonOutput.select();
+                setEditorMessage('复制失败，请手动复制文本框内容');
+            }
+        }
+
+        function getFloatingClassForEmoji(emoji) {
+            if (emoji === '🐺') return 'is-wolf';
+            if (emoji === '🧱') return 'is-obstacle';
+            return 'is-person';
+        }
+
+        function getDirectionLabel(direction) {
+            const labels = {
+                up: '上',
+                down: '下',
+                left: '左',
+                right: '右'
+            };
+            return labels[direction] || direction;
         }
 
         class RoleBehavior {
@@ -163,7 +679,7 @@
                 const stillExists = turnContext.result[this.type].some(e => e.id === oldEntity.id);
                 if (stillExists) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { removeOnComplete: false })
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { id: oldEntity.id, removeOnComplete: false })
                             .then(el => floatingEntities.push(el))
                     );
                 }
@@ -207,22 +723,22 @@
 
                 if (isEscaped) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300)
-                            .then(() => createEffectEntity(this.emoji, newPos.row, newPos.col, 'escape'))
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300, { id: oldEntity.id })
+                            .then(() => createEffectEntity(this.emoji, newPos.row, newPos.col, 'escape', oldEntity.id))
                     );
                 } else if (isEaten) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300, { removeOnComplete: false })
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300, { id: oldEntity.id, removeOnComplete: false })
                             .then(el => floatingEntities.push(el))
                     );
                 } else if (isTrapped) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300)
-                            .then(() => createEffectEntity(this.emoji, newPos.row, newPos.col, 'trap-hit'))
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300, { id: oldEntity.id })
+                            .then(() => createEffectEntity(this.emoji, newPos.row, newPos.col, 'trap-hit', oldEntity.id))
                     );
                 } else if (stillExists) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { removeOnComplete: false })
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { id: oldEntity.id, removeOnComplete: false })
                             .then(el => floatingEntities.push(el))
                     );
                 }
@@ -286,21 +802,21 @@
 
                 if (isTrapped) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300)
-                            .then(() => createEffectEntity(this.emoji, newPos.row, newPos.col, 'trap-hit'))
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300, { id: oldEntity.id })
+                            .then(() => createEffectEntity(this.emoji, newPos.row, newPos.col, 'trap-hit', oldEntity.id))
                     );
                 } else if (stillExists && attack) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300)
-                            .then(() => animateEntity(attack.fromRow, attack.fromCol, attack.toRow, attack.toCol, this.emoji, 180, { removeOnComplete: false }))
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 300, { id: oldEntity.id })
+                            .then(() => animateEntity(attack.fromRow, attack.fromCol, attack.toRow, attack.toCol, this.emoji, 180, { id: oldEntity.id, removeOnComplete: false }))
                             .then(el => {
                                 floatingEntities.push(el);
-                                return createEffectEntity('🐑', attack.toRow, attack.toCol, 'eaten');
+                                return createEffectEntity('🐑', attack.toRow, attack.toCol, 'eaten', attack.targetId);
                             })
                     );
                 } else if (stillExists) {
                     animations.push(
-                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { removeOnComplete: false })
+                        animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { id: oldEntity.id, removeOnComplete: false })
                             .then(el => floatingEntities.push(el))
                     );
                 }
@@ -329,7 +845,7 @@
                 if (!newPos) return;
 
                 animations.push(
-                    animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { removeOnComplete: false })
+                    animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { id: oldEntity.id, removeOnComplete: false })
                         .then(el => floatingEntities.push(el))
                 );
             }
@@ -387,21 +903,27 @@
             wolfCount = wolfEntities.length;
             updateUI();
             renderGrid();
-            messageDisplay.textContent = '🐑 滑动屏幕移动角色';
+            messageDisplay.textContent = '滑动棋盘，护送小羊逃进土楼';
             levelDisplay.textContent = `第 ${index + 1} 关`;
+            if (seasonDisplay) {
+                seasonDisplay.textContent = SEASON_TERMS[index % SEASON_TERMS.length];
+            }
         }
 
         // ========== 渲染网格 ==========
         function renderGrid() {
             gridContainer.style.gridTemplateColumns = `repeat(${COLS}, var(--cell-size))`;
+            gridContainer.style.setProperty('--rows', ROWS);
+            gridContainer.style.setProperty('--cols', COLS);
             gridContainer.innerHTML = '';
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     const cell = document.createElement('div');
-                    cell.className = 'cell';
                     cell.dataset.row = r;
                     cell.dataset.col = c;
                     const id = grid[r][c];
+                    cell.className = `cell ${getEntityClassForId(id)}`;
+                    applySpriteStyle(cell, id);
                     const emoji = getEmojiForId(id);
                     
                     if (OBSTACLE_IDS.includes(id)) cell.classList.add('obstacle');
@@ -434,16 +956,17 @@
 
         // ========== 缓动动画 ==========
         function animateEntity(fromRow, fromCol, toRow, toCol, emoji, duration = 300, options = {}) {
-            const { removeOnComplete = true } = options;
+            const { id, removeOnComplete = true } = options;
             return new Promise((resolve) => {
                 const startPos = getCellPixelPosition(fromRow, fromCol);
                 const endPos = getCellPixelPosition(toRow, toCol);
                 
                 const el = document.createElement('div');
-                el.className = 'floating-entity';
+                el.className = `floating-entity ${getFloatingClassForEmoji(emoji)}`;
                 el.textContent = emoji;
-                el.style.left = (startPos.left - 15) + 'px';
-                el.style.top = (startPos.top - 15) + 'px';
+                applySpriteStyle(el, id);
+                el.style.left = startPos.left + 'px';
+                el.style.top = startPos.top + 'px';
                 el.style.fontSize = getComputedStyle(document.querySelector('.cell .emoji')).fontSize;
                 gridContainer.appendChild(el);
 
@@ -457,8 +980,8 @@
                     const currentX = startPos.left + (endPos.left - startPos.left) * eased;
                     const currentY = startPos.top + (endPos.top - startPos.top) * eased;
                     
-                    el.style.left = (currentX - 15) + 'px';
-                    el.style.top = (currentY - 15) + 'px';
+                    el.style.left = currentX + 'px';
+                    el.style.top = currentY + 'px';
                     
                     if (progress < 1) {
                         requestAnimationFrame(animate);
@@ -473,14 +996,15 @@
             });
         }
 
-        function createEffectEntity(emoji, row, col, className) {
+        function createEffectEntity(emoji, row, col, className, id) {
             return new Promise((resolve) => {
                 const pos = getCellPixelPosition(row, col);
                 const el = document.createElement('div');
-                el.className = `floating-entity ${className}`;
+                el.className = `floating-entity ${getFloatingClassForEmoji(emoji)} ${className}`;
                 el.textContent = emoji;
-                el.style.left = (pos.left - 15) + 'px';
-                el.style.top = (pos.top - 15) + 'px';
+                applySpriteStyle(el, id);
+                el.style.left = pos.left + 'px';
+                el.style.top = pos.top + 'px';
                 el.style.fontSize = getComputedStyle(document.querySelector('.cell .emoji')).fontSize;
                 gridContainer.appendChild(el);
                 
@@ -697,21 +1221,19 @@
 
                 if (status === 'win') {
                     gameOver = true;
-                    messageDisplay.textContent = '🎉 胜利！小羊们成功逃跑！';
+                    messageDisplay.textContent = '护羊成功，小羊已逃进土楼';
 
                     if (currentLevel < LEVEL_CONFIGS.length - 1) {
-                        await wait(700);
-                        currentLevel++;
-                        loadLevel(currentLevel);
+                        showGameModal('护羊成功', '小羊安全进楼，继续穿过下一条山路。', { showNext: true });
                     } else {
-                        showGameModal('全部通关', '恭喜完成所有关卡，点击重玩回到当前关。');
+                        showGameModal('狼来了通关', '小羊都走过了山路，回到首页可以重新开始。');
                     }
                 } else if (status === 'lose') {
                     gameOver = true;
-                    messageDisplay.textContent = '😱 没有小羊可以继续逃跑了... 失败';
-                    showGameModal('游戏结束', '没有小羊可以继续逃跑了，点击重玩再试一次。');
+                    messageDisplay.textContent = '小羊被狼拦住了，请重新规划路线';
+                    showGameModal('护羊失败', '没有小羊可以继续进楼，重走这一段山路。');
                 } else {
-                    messageDisplay.textContent = `➡️ 向${context.direction}移动`;
+                    messageDisplay.textContent = `小羊和野狼向${getDirectionLabel(context.direction)}滑动`;
                 }
 
                 return TURN_STATE.IDLE;
@@ -737,9 +1259,9 @@
         }
 
         // ========== 重置关卡 ==========
-        function resetLevel() {
-            if (isMoving) return;
-            loadLevel(currentLevel);
+        async function resetLevel() {
+            if (isMoving || isTransitioning) return;
+            await transitionToLevel(currentLevel);
         }
 
         // ========== 滑动控制 ==========
@@ -747,7 +1269,7 @@
         let isDragging = false;
 
         function handleSwipeStart(e) {
-            if (gameOver || isMoving) return;
+            if (gameOver || isMoving || isTransitioning) return;
             const t = e.touches ? e.touches[0] : e;
             touchStartX = t.clientX;
             touchStartY = t.clientY;
@@ -755,7 +1277,7 @@
         }
 
         function handleSwipeEnd(e) {
-            if (!isDragging || gameOver || isMoving) {
+            if (!isDragging || gameOver || isMoving || isTransitioning) {
                 isDragging = false;
                 return;
             }
@@ -795,31 +1317,72 @@
             container.addEventListener('mouseleave', () => { isDragging = false; });
             container.addEventListener('contextmenu', e => e.preventDefault());
 
+            if (startGameBtn) {
+                startGameBtn.addEventListener('click', startGame);
+            }
+            if (openEditorBtn) {
+                openEditorBtn.addEventListener('click', showEditorScene);
+            }
+            if (editorHomeBtn) {
+                editorHomeBtn.addEventListener('click', showStartScreen);
+            }
+            if (editorPlayBtn) {
+                editorPlayBtn.addEventListener('click', playEditorLevel);
+            }
+            if (editorResizeBtn) {
+                editorResizeBtn.addEventListener('click', resizeEditorMapFromInputs);
+            }
+            if (editorCopyJsonBtn) {
+                editorCopyJsonBtn.addEventListener('click', copyEditorJson);
+            }
+            if (editorSaveBtn) {
+                editorSaveBtn.addEventListener('click', saveEditorLevel);
+            }
+            if (editorClearBtn) {
+                editorClearBtn.addEventListener('click', clearEditorMap);
+            }
+            if (homeBtn) {
+                homeBtn.addEventListener('click', goHome);
+            }
+            if (modalHomeBtn) {
+                modalHomeBtn.addEventListener('click', handleModalHome);
+            }
+            if (modalNextBtn) {
+                modalNextBtn.addEventListener('click', goNextLevel);
+            }
             document.getElementById('resetBtn').addEventListener('click', resetLevel);
             if (modalResetBtn) {
-                modalResetBtn.addEventListener('click', resetLevel);
+                modalResetBtn.addEventListener('click', handleModalReset);
             }
-            document.getElementById('prevLevelBtn').addEventListener('click', () => {
-                if (currentLevel > 0 && !isMoving) {
-                    currentLevel--;
-                    loadLevel(currentLevel);
+            document.getElementById('prevLevelBtn').addEventListener('click', async () => {
+                if (currentLevel > 0 && !isMoving && !isTransitioning) {
+                    await transitionToLevel(currentLevel - 1);
                 } else if (currentLevel === 0) {
                     messageDisplay.textContent = '已经是第一关';
                 }
             });
-            document.getElementById('nextLevelBtn').addEventListener('click', () => {
-                if (currentLevel < LEVEL_CONFIGS.length - 1 && !isMoving) {
-                    currentLevel++;
-                    loadLevel(currentLevel);
+            document.getElementById('nextLevelBtn').addEventListener('click', async () => {
+                if (currentLevel < LEVEL_CONFIGS.length - 1 && !isMoving && !isTransitioning) {
+                    await transitionToLevel(currentLevel + 1);
                 } else if (currentLevel === LEVEL_CONFIGS.length - 1) {
-                    messageDisplay.textContent = '恭喜通关所有关卡！';
+                    messageDisplay.textContent = '狼来了已经走到终章';
                 }
             });
         }
 
-        // ========== 启动游戏 ==========
-        loadLevel(0);
-        initEvents();
-        window.addEventListener('touchmove', preventTouch, { passive: false });
+        async function bootGame() {
+            await loadCustomLevelMaps();
+            if (levelsReady) {
+                loadLevel(0);
+            }
+            showStartScreen();
+            syncEditorSizeInputs();
+            renderEditorCategoryTabs();
+            renderEditorPalette();
+            initEvents();
+            window.addEventListener('touchmove', preventTouch, { passive: false });
+        }
+
+        bootGame();
 })();
 

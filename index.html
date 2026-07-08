@@ -3,39 +3,134 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>喜羊羊与灰太狼 - 大逃亡</title>
+    <title>狼来了</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
-<div class="game-wrapper" id="app">
-    <div class="header">
-        <div>🐑 喜羊羊与灰太狼</div>
-        <div class="level-info">
-            <span id="levelDisplay">第 1 关</span>
-            <button class="level-btn" id="prevLevelBtn">◀</button>
-            <button class="level-btn" id="nextLevelBtn">▶</button>
+<div class="app-shell" id="app">
+    <section class="start-screen" id="startScreen" aria-label="狼来了开始页">
+        <div class="start-cloud start-cloud-top"></div>
+        <div class="start-cloud start-cloud-bottom"></div>
+        <div class="start-content">
+            <div class="title-lockup">
+                <span class="title-kicker">福建山野</span>
+                <h1>狼来了</h1>
+                <p>小羊快跑</p>
+            </div>
+            <img class="tulou-hero" src="assets/hujian-tulou/tulou-main.png" alt="">
+            <button class="start-button" id="startGameBtn" aria-label="开始游戏">
+                <img src="assets/hujian-tulou/button-start.png" alt="">
+            </button>
+            <button class="editor-entry-button" id="openEditorBtn" type="button">关卡编辑</button>
         </div>
-    </div>
+    </section>
 
-    <div class="grid-container" id="gridContainer"></div>
+    <section class="game-wrapper editor-scene is-hidden" id="editorScene" aria-label="关卡编辑">
+        <div class="top-panel editor-top-panel">
+            <button class="icon-btn home-icon" id="editorHomeBtn" aria-label="返回开始页"></button>
+            <div class="level-card">
+                <span>编辑关卡</span>
+                <strong>狼来了</strong>
+            </div>
+            <div class="editor-level-input">
+                <label for="editorLevelInput">关卡</label>
+                <input id="editorLevelInput" type="number" min="1" max="100" value="1">
+            </div>
+        </div>
 
-    <div class="status-bar">
-        <div>🐑 剩余: <span id="sheepCount">0</span></div>
-        <div class="goal">🎯 <span id="goalDisplay">0</span></div>
-        <div>🐺 狼: <span id="wolfCount">0</span></div>
-        <button class="reset-btn" id="resetBtn">↺ 重玩</button>
+        <div class="editor-tools">
+            <div class="editor-size-controls" aria-label="地图尺寸">
+                <label for="editorRowsInput">行</label>
+                <input id="editorRowsInput" type="number" min="1" max="10" value="6">
+                <label for="editorColsInput">列</label>
+                <input id="editorColsInput" type="number" min="1" max="10" value="6">
+                <button class="editor-action-btn compact" id="editorResizeBtn" type="button">生成地图</button>
+            </div>
+            <div class="editor-action-row">
+                <button class="editor-action-btn" id="editorClearBtn" type="button">清空</button>
+                <button class="editor-action-btn" id="editorPlayBtn" type="button">试玩</button>
+                <button class="editor-action-btn primary" id="editorSaveBtn" type="button">保存</button>
+            </div>
+        </div>
+
+        <div class="grid-frame editor-grid-frame">
+            <div class="grid-container editor-grid" id="editorGrid"></div>
+        </div>
+
+        <div class="editor-category-tabs" id="editorCategoryTabs" aria-label="素材分类"></div>
+        <div class="editor-palette" id="editorPalette" aria-label="选择放置物"></div>
+        <div class="editor-export-panel hidden" id="editorExportPanel">
+            <div class="editor-export-head">
+                <span>关卡 JSON</span>
+                <button class="editor-action-btn compact" id="editorCopyJsonBtn" type="button">复制</button>
+            </div>
+            <textarea id="editorJsonOutput" readonly spellcheck="false" aria-label="导出的关卡 JSON"></textarea>
+        </div>
+        <div class="message editor-message" id="editorMessage">选择下方素材，点击地图放置</div>
+    </section>
+
+    <section class="game-wrapper game-scene is-hidden" id="gameScene" aria-label="狼来了游戏关卡">
+        <div class="top-panel">
+            <button class="icon-btn home-icon" id="homeBtn" aria-label="返回开始页"></button>
+            <div class="level-card">
+                <span>护羊路线</span>
+                <strong id="levelDisplay">第 1 关</strong>
+            </div>
+            <div class="level-controls">
+                <button class="round-btn prev-icon" id="prevLevelBtn" aria-label="上一关"></button>
+                <button class="round-btn next-icon" id="nextLevelBtn" aria-label="下一关"></button>
+                <button class="round-btn replay-icon" id="resetBtn" aria-label="重玩本关"></button>
+            </div>
+        </div>
+
+        <div class="season-bar">
+            <span id="seasonDisplay">立春</span>
+            <span>沿溪回楼</span>
+        </div>
+
+        <div class="grid-frame">
+            <div class="grid-container" id="gridContainer"></div>
+        </div>
+
+        <div class="status-bar">
+            <div>
+                <span class="status-label">小羊</span>
+                <strong id="sheepCount">0</strong>
+            </div>
+            <div class="goal">
+                <span class="status-label">进楼</span>
+                <strong id="goalDisplay">0</strong>
+            </div>
+            <div>
+                <span class="status-label">野狼</span>
+                <strong id="wolfCount">0</strong>
+            </div>
+        </div>
+        <div class="message" id="messageDisplay">滑动棋盘，护送小羊逃进土楼</div>
+    </section>
+
+    <div class="level-loading hidden" id="levelLoading" aria-hidden="true">
+        <div class="loading-cloud loading-cloud-a"></div>
+        <div class="loading-cloud loading-cloud-b"></div>
+        <div class="loading-cloud loading-cloud-c"></div>
     </div>
-    <div class="message" id="messageDisplay">🐑 滑动屏幕移动角色</div>
 </div>
 <div class="game-modal hidden" id="gameModal">
     <div class="game-modal-panel">
+        <div class="modal-cloud"></div>
         <div class="game-modal-title" id="modalTitle">游戏结束</div>
         <div class="game-modal-message" id="modalMessage">点击重玩再试一次</div>
-        <button class="reset-btn" id="modalResetBtn">↺ 重玩</button>
+        <div class="modal-actions">
+            <button class="icon-btn home-icon" id="modalHomeBtn" aria-label="返回开始页"></button>
+            <button class="icon-btn replay-icon" id="modalResetBtn" aria-label="重玩本关"></button>
+            <button class="icon-btn next-icon hidden" id="modalNextBtn" aria-label="下一关"></button>
+        </div>
     </div>
 </div>
 <script src="js/levels.js"></script>
+<script src="js/editor-core.js"></script>
 <script src="js/game.js"></script>
 
 </body>
