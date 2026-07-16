@@ -29,6 +29,9 @@
 
 // ========== 游戏状态 ==========
         let currentLevel = 0;
+        let maxUnlockedLevel = 0;
+        let progressTracking = true;
+        const PROGRESS_STORAGE_KEY = 'slideweb-max-unlocked-level';
         let grid = [];
         let ROWS = 6;
         let COLS = 6;
@@ -167,6 +170,47 @@
         };
 
         // ========== 工具函数 ==========
+        function loadLevelProgress() {
+            try {
+                const raw = localStorage.getItem(PROGRESS_STORAGE_KEY);
+                const value = Number(raw);
+                maxUnlockedLevel = Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
+            } catch {
+                maxUnlockedLevel = 0;
+            }
+        }
+
+        function saveLevelProgress() {
+            try {
+                localStorage.setItem(PROGRESS_STORAGE_KEY, String(maxUnlockedLevel));
+            } catch {
+                // ignore quota / private mode failures
+            }
+        }
+
+        function clampLevelProgress() {
+            if (!LEVEL_CONFIGS.length) {
+                maxUnlockedLevel = 0;
+                return;
+            }
+            maxUnlockedLevel = Math.max(0, Math.min(maxUnlockedLevel, LEVEL_CONFIGS.length - 1));
+        }
+
+        function unlockNextLevelProgress() {
+            if (!progressTracking || !LEVEL_CONFIGS.length) return;
+            const unlocked = Math.min(currentLevel + 1, LEVEL_CONFIGS.length - 1);
+            if (unlocked > maxUnlockedLevel) {
+                maxUnlockedLevel = unlocked;
+                saveLevelProgress();
+            }
+        }
+
+        function canSkipToNextLevel() {
+            if (!LEVEL_CONFIGS.length) return false;
+            if (!progressTracking) return currentLevel < LEVEL_CONFIGS.length - 1;
+            return currentLevel < maxUnlockedLevel && currentLevel < LEVEL_CONFIGS.length - 1;
+        }
+
         function getCellPixelPosition(row, col) {
             const cell = getCellElement(row, col);
             if (!cell) return { left: 0, top: 0 };
@@ -299,11 +343,13 @@
 
         async function goNextLevel() {
             if (isMoving || isTransitioning) return;
-            if (currentLevel < LEVEL_CONFIGS.length - 1) {
+            if (canSkipToNextLevel()) {
                 showGameScene();
                 await transitionToLevel(currentLevel + 1);
-            } else {
+            } else if (currentLevel >= LEVEL_CONFIGS.length - 1) {
                 showGameModal('狼来了通关', '小羊都走过了山路，回到首页可以重新开始。');
+            } else {
+                messageDisplay.textContent = '请先通关当前关卡，才能进入下一关';
             }
         }
 
@@ -347,6 +393,8 @@
             LEVEL_CONFIGS.length = 0;
             LEVEL_CONFIGS.push(...levelConfigs);
             levelsReady = levelConfigs.length > 0;
+            progressTracking = true;
+            clampLevelProgress();
             currentLevel = levelsReady ? Math.min(currentLevel, levelConfigs.length - 1) : 0;
             return levelsReady;
         }
@@ -525,6 +573,7 @@
             LEVEL_CONFIGS.length = 0;
             LEVEL_CONFIGS.push(level);
             levelsReady = true;
+            progressTracking = false;
             await transitionToLevel(0);
             showGameScene();
         }
@@ -1184,6 +1233,7 @@
                 if (status === 'win') {
                     gameOver = true;
                     messageDisplay.textContent = '成功，小羊已逃进羊村';
+                    unlockNextLevelProgress();
 
                     if (currentLevel < LEVEL_CONFIGS.length - 1) {
                         showGameModal('逃跑成功', '小羊成功逃脱，继续穿过下一条山路。', { showNext: true });
@@ -1321,18 +1371,23 @@
                 }
             });
             document.getElementById('nextLevelBtn').addEventListener('click', async () => {
-                if (currentLevel < LEVEL_CONFIGS.length - 1 && !isMoving && !isTransitioning) {
+                if (isMoving || isTransitioning) return;
+                if (canSkipToNextLevel()) {
                     await transitionToLevel(currentLevel + 1);
-                } else if (currentLevel === LEVEL_CONFIGS.length - 1) {
+                } else if (currentLevel >= LEVEL_CONFIGS.length - 1) {
                     messageDisplay.textContent = '狼来了已经走到终章';
+                } else {
+                    messageDisplay.textContent = '请先通关当前关卡，才能进入下一关';
                 }
             });
         }
 
         async function bootGame() {
+            loadLevelProgress();
             await loadLevelData();
             if (levelsReady) {
-                loadLevel(0);
+                currentLevel = Math.min(currentLevel, maxUnlockedLevel);
+                loadLevel(currentLevel);
             }
             showStartScreen();
             syncEditorSizeInputs();
