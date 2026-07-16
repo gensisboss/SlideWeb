@@ -862,13 +862,13 @@
             wolfCount = wolfEntities.length;
             updateUI();
             renderGrid();
-            messageDisplay.textContent = '滑动棋盘，护送小羊逃进土楼';
+            messageDisplay.textContent = '滑动屏幕，护送小羊逃进羊村';
             if (levelDisplay) {
                 levelDisplay.textContent = `第 ${index + 1} 关`;
             }
             if (levelTitle) {
                 const title = typeof config.title === 'string' ? config.title.trim() : '';
-                levelTitle.textContent = title || '护羊路线';
+                levelTitle.textContent = title;
             }
         }
 
@@ -1073,7 +1073,7 @@
         // ========== 应用状态到grid ==========
         function applyStaticState(options = {}) {
             const { includeObstacles = true } = options;
-            // 从实体状态重建棋盘，避免被移除的陷阱等旧格子残留。
+            // 从实体状态重建屏幕，避免被移除的陷阱等旧格子残留。
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     grid[r][c] = 0;
@@ -1183,17 +1183,17 @@
 
                 if (status === 'win') {
                     gameOver = true;
-                    messageDisplay.textContent = '护羊成功，小羊已逃进土楼';
+                    messageDisplay.textContent = '成功，小羊已逃进羊村';
 
                     if (currentLevel < LEVEL_CONFIGS.length - 1) {
-                        showGameModal('护羊成功', '小羊安全进楼，继续穿过下一条山路。', { showNext: true });
+                        showGameModal('逃跑成功', '小羊成功逃脱，继续穿过下一条山路。', { showNext: true });
                     } else {
                         showGameModal('狼来了通关', '小羊都走过了山路，回到首页可以重新开始。');
                     }
                 } else if (status === 'lose') {
                     gameOver = true;
                     messageDisplay.textContent = '小羊被狼拦住了，请重新规划路线';
-                    showGameModal('护羊失败', '没有小羊可以继续进楼，重走这一段山路。');
+                    showGameModal('逃跑失败', '没有小羊可以继续进楼，重走这一段山路。');
                 } else {
                     messageDisplay.textContent = `小羊和野狼向${getDirectionLabel(context.direction)}滑动`;
                 }
