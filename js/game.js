@@ -7,7 +7,6 @@
         VILLAGE_IDS,
         ID_TO_CHAR,
         LEVEL_CONFIGS,
-        MOVING_OBSTACLE_START_LEVEL
     } = window.GameConfig;
 
         const ROLE_TYPE = {
@@ -57,13 +56,11 @@
         const editorCategoryTabs = document.getElementById('editorCategoryTabs');
         const editorPalette = document.getElementById('editorPalette');
         const editorMessage = document.getElementById('editorMessage');
-        const editorLevelInput = document.getElementById('editorLevelInput');
+        const editorGoalInput = document.getElementById('editorGoalInput');
+        const editorMoveObstacleInput = document.getElementById('editorMoveObstacleInput');
         const editorRowsInput = document.getElementById('editorRowsInput');
         const editorColsInput = document.getElementById('editorColsInput');
         const editorResizeBtn = document.getElementById('editorResizeBtn');
-        const editorExportPanel = document.getElementById('editorExportPanel');
-        const editorJsonOutput = document.getElementById('editorJsonOutput');
-        const editorCopyJsonBtn = document.getElementById('editorCopyJsonBtn');
         const editorPlayBtn = document.getElementById('editorPlayBtn');
         const editorSaveBtn = document.getElementById('editorSaveBtn');
         const editorClearBtn = document.getElementById('editorClearBtn');
@@ -99,7 +96,7 @@
         };
 
         const SPRITE_BASE = 'assets/hujian-tulou/';
-        const CUSTOM_LEVELS_URL = 'data/custom-levels.json';
+        const LEVELS_URL = 'data/level.json';
         const DEFAULT_EDITOR_ROWS = 6;
         const DEFAULT_EDITOR_COLS = 6;
         const MIN_EDITOR_SIZE = 1;
@@ -165,9 +162,8 @@
         let editorMap = editorCore.createEmptyMap(editorRows, editorCols);
         let selectedEditorId = SHEEP_IDS[0];
         let selectedEditorGroup = 'sheep';
-        let levelMaps = [];
+        let levelConfigs = [];
         let levelsReady = false;
-        let pendingLevelSave = null;
         let modalMode = 'game';
 
         const DIR = {
@@ -197,6 +193,10 @@
             return `${row},${col}`;
         }
 
+        function getEntityKey(entity) {
+            return entity.entityKey || `${entity.type || 'terrain'}-${entity.id}-${entity.row}-${entity.col}`;
+        }
+
         function getEmojiForId(id) {
             if (id === 0) return '🌿';
             return ID_TO_CHAR[id] || '❓';
@@ -218,7 +218,7 @@
         }
 
         function isMovingObstacleLevel() {
-            return currentLevel + 1 >= MOVING_OBSTACLE_START_LEVEL;
+            return Number(LEVEL_CONFIGS[currentLevel]?.moveObstacle) === 1;
         }
 
         function showGameModal(title, message, options = {}) {
@@ -271,7 +271,7 @@
 
         async function startGame() {
             if (!levelsReady || LEVEL_CONFIGS.length === 0) {
-                showGameModal('需要关卡数据', '没有读取到关卡 JSON，请先进入关卡编辑并生成关卡数据。', {
+                showGameModal('需要关卡数据', '没有读取到 data/level.json，请检查关卡文件。', {
                     mode: 'missingLevels',
                     resetLabel: '去编辑',
                     homeLabel: '返回首页'
@@ -292,25 +292,10 @@
         }
 
         function handleModalHome() {
-            if (modalMode === 'confirmOverwrite') {
-                pendingLevelSave = null;
-                hideGameModal();
-                showEditorScene();
-                setEditorMessage('已取消覆盖');
-                return;
-            }
             goHome();
         }
 
         function handleModalReset() {
-            if (modalMode === 'confirmOverwrite') {
-                if (pendingLevelSave) {
-                    finalizeEditorLevelSave(pendingLevelSave.plan, pendingLevelSave.map);
-                }
-                hideGameModal();
-                showEditorScene();
-                return;
-            }
             if (modalMode === 'missingLevels') {
                 hideGameModal();
                 showEditorScene();
@@ -364,45 +349,23 @@
             isTransitioning = false;
         }
 
-        function mapToLevel(map) {
-            const sheepTotal = map.flat().filter(id => SHEEP_IDS.includes(id)).length;
-            return editorCore.buildLevelFromMap(map, Math.max(1, sheepTotal));
-        }
-
-        function applyLevelMaps(maps) {
-            levelMaps = editorCore.normalizeLevelMaps(maps);
+        function applyLevels(source) {
+            levelConfigs = editorCore.normalizeLevels(source);
             LEVEL_CONFIGS.length = 0;
-            LEVEL_CONFIGS.push(...levelMaps.map(mapToLevel));
-            levelsReady = levelMaps.length > 0;
-            currentLevel = levelsReady ? Math.min(currentLevel, LEVEL_CONFIGS.length - 1) : 0;
+            LEVEL_CONFIGS.push(...levelConfigs);
+            levelsReady = levelConfigs.length > 0;
+            currentLevel = levelsReady ? Math.min(currentLevel, levelConfigs.length - 1) : 0;
             return levelsReady;
         }
 
-        async function loadCustomLevelMaps() {
+        async function loadLevelData() {
             try {
-                const response = await fetch(`${CUSTOM_LEVELS_URL}?t=${Date.now()}`, { cache: 'no-store' });
-                if (!response.ok) return applyLevelMaps([]);
-                return applyLevelMaps(await response.json());
+                const response = await fetch(`${LEVELS_URL}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!response.ok) return applyLevels([]);
+                return applyLevels(await response.json());
             } catch {
-                return applyLevelMaps([]);
+                return applyLevels([]);
             }
-        }
-
-        function exportCurrentLevelMaps(messageLevelNumber) {
-            if (!editorJsonOutput || !editorExportPanel) return;
-            editorJsonOutput.value = editorCore.exportLevelMapsJson(levelMaps);
-            editorExportPanel.classList.remove('hidden');
-            setEditorMessage(`已生成二维数组 JSON，请复制覆盖 ${CUSTOM_LEVELS_URL}（第 ${messageLevelNumber} 关）`);
-        }
-
-        function finalizeEditorLevelSave(plan, map) {
-            levelMaps = editorCore.applyLevelMapSave(levelMaps, plan.targetLevelNumber, map);
-            LEVEL_CONFIGS.length = 0;
-            LEVEL_CONFIGS.push(...levelMaps.map(mapToLevel));
-            levelsReady = LEVEL_CONFIGS.length > 0;
-            currentLevel = Math.min(currentLevel, LEVEL_CONFIGS.length - 1);
-            exportCurrentLevelMaps(plan.targetLevelNumber);
-            pendingLevelSave = null;
         }
 
         function getEntityClassForId(id) {
@@ -447,15 +410,15 @@
 
         function getEditorGoal() {
             const sheepTotal = editorMap.flat().filter(id => SHEEP_IDS.includes(id)).length;
-            return Math.max(1, sheepTotal);
+            const fallback = Math.max(1, sheepTotal || 1);
+            const value = Number(editorGoalInput?.value || fallback);
+            const goalNumber = Math.max(1, Number.isFinite(value) ? Math.floor(value) : fallback);
+            if (editorGoalInput) editorGoalInput.value = String(goalNumber);
+            return goalNumber;
         }
 
-        function getEditorLevelNumber() {
-            const fallback = currentLevel + 1;
-            const value = Number(editorLevelInput?.value || fallback);
-            const levelNumber = Math.max(1, Number.isFinite(value) ? Math.floor(value) : fallback);
-            if (editorLevelInput) editorLevelInput.value = String(levelNumber);
-            return levelNumber;
+        function getEditorMoveObstacle() {
+            return editorMoveObstacleInput?.checked ? 1 : 0;
         }
 
         function clampEditorSize(value, fallback) {
@@ -559,13 +522,13 @@
         }
 
         function buildEditorLevel() {
-            return editorCore.buildLevelFromMap(editorMap, getEditorGoal());
+            return editorCore.buildLevelFromMap(editorMap, getEditorGoal(), getEditorMoveObstacle());
         }
 
         async function playEditorLevel() {
             if (isMoving || isTransitioning) return;
             const level = buildEditorLevel();
-            levelMaps = [editorMap.map(row => [...row])];
+            levelConfigs = [level];
             LEVEL_CONFIGS.length = 0;
             LEVEL_CONFIGS.push(level);
             levelsReady = true;
@@ -573,20 +536,31 @@
             showGameScene();
         }
 
-        function saveEditorLevel() {
-            const levelNumber = getEditorLevelNumber();
-            const plan = editorCore.planLevelMapSave(levelMaps, levelNumber);
-            const map = editorMap.map(row => [...row]);
-            if (plan.requiresConfirmation) {
-                pendingLevelSave = { plan, map };
-                showGameModal(
-                    '覆盖关卡数据',
-                    `JSON 中已经有第 ${plan.targetLevelNumber} 关，确认覆盖这关数据吗？`,
-                    { mode: 'confirmOverwrite', resetLabel: '确认覆盖', homeLabel: '取消' }
-                );
-                return;
+        async function writeTextToClipboard(text) {
+            if (navigator.clipboard?.writeText) {
+                await navigator.clipboard.writeText(text);
+                return true;
             }
-            finalizeEditorLevelSave(plan, map);
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.setAttribute('readonly', '');
+            textarea.style.position = 'fixed';
+            textarea.style.left = '-9999px';
+            document.body.appendChild(textarea);
+            textarea.select();
+            const copied = document.execCommand('copy');
+            textarea.remove();
+            return copied;
+        }
+
+        async function saveEditorLevel() {
+            const levelJson = editorCore.exportLevelJson(buildEditorLevel());
+            try {
+                const copied = await writeTextToClipboard(levelJson);
+                setEditorMessage(copied ? '关卡数据已复制到剪贴板' : '复制失败，请重新点击保存');
+            } catch {
+                setEditorMessage('复制失败，请检查浏览器剪贴板权限');
+            }
         }
 
         function clearEditorMap() {
@@ -602,26 +576,6 @@
             editorMap = editorCore.resizeMap(editorMap, editorRows, editorCols);
             renderEditor();
             setEditorMessage(`已生成 ${editorRows} 行 × ${editorCols} 列地图`);
-        }
-
-        async function copyEditorJson() {
-            if (!editorJsonOutput || !editorJsonOutput.value) {
-                setEditorMessage('请先保存生成 JSON');
-                return;
-            }
-
-            try {
-                if (navigator.clipboard?.writeText) {
-                    await navigator.clipboard.writeText(editorJsonOutput.value);
-                } else {
-                    editorJsonOutput.select();
-                    document.execCommand('copy');
-                }
-                setEditorMessage('关卡 JSON 已复制');
-            } catch {
-                editorJsonOutput.select();
-                setEditorMessage('复制失败，请手动复制文本框内容');
-            }
         }
 
         function getFloatingClassForEmoji(emoji) {
@@ -673,10 +627,11 @@
             resolveRoleActions() {}
 
             queueAnimation(oldEntity, turnContext, animations, floatingEntities) {
-                const newPos = turnContext.movedById.get(oldEntity.id);
+                const entityKey = getEntityKey(oldEntity);
+                const newPos = turnContext.movedById.get(entityKey);
                 if (!newPos) return;
 
-                const stillExists = turnContext.result[this.type].some(e => e.id === oldEntity.id);
+                const stillExists = turnContext.result[this.type].some(e => getEntityKey(e) === entityKey);
                 if (stillExists) {
                     animations.push(
                         animateEntity(oldEntity.row, oldEntity.col, newPos.row, newPos.col, this.emoji, 350, { id: oldEntity.id, removeOnComplete: false })
@@ -712,14 +667,15 @@
             }
 
             queueAnimation(oldEntity, turnContext, animations, floatingEntities) {
-                const newPos = turnContext.movedById.get(oldEntity.id);
+                const entityKey = getEntityKey(oldEntity);
+                const newPos = turnContext.movedById.get(entityKey);
                 if (!newPos) return;
 
                 const result = turnContext.result;
-                const isEscaped = result.escaped.some(e => e.id === oldEntity.id);
-                const isEaten = result.eaten.some(e => e.id === oldEntity.id);
-                const isTrapped = result.trapSheep.some(e => e.id === oldEntity.id);
-                const stillExists = result.sheep.some(e => e.id === oldEntity.id);
+                const isEscaped = result.escaped.some(e => getEntityKey(e) === entityKey);
+                const isEaten = result.eaten.some(e => getEntityKey(e) === entityKey);
+                const isTrapped = result.trapSheep.some(e => getEntityKey(e) === entityKey);
+                const stillExists = result.sheep.some(e => getEntityKey(e) === entityKey);
 
                 if (isEscaped) {
                     animations.push(
@@ -776,7 +732,7 @@
                     reservedAttackCells.add(targetKey);
                     result.eaten.push(target);
                     result.wolfAttacks.push({
-                        wolfId: wolf.id,
+                        wolfKey: getEntityKey(wolf),
                         fromRow: wolf.row,
                         fromCol: wolf.col,
                         toRow: target.row,
@@ -787,18 +743,19 @@
                     wolf.col = target.col;
                 }
 
-                const eatenIds = new Set(result.eaten.map(s => s.id));
-                result.sheep = result.sheep.filter(s => !eatenIds.has(s.id));
+                const eatenKeys = new Set(result.eaten.map(getEntityKey));
+                result.sheep = result.sheep.filter(s => !eatenKeys.has(getEntityKey(s)));
             }
 
             queueAnimation(oldEntity, turnContext, animations, floatingEntities) {
-                const newPos = turnContext.movedById.get(oldEntity.id);
+                const entityKey = getEntityKey(oldEntity);
+                const newPos = turnContext.movedById.get(entityKey);
                 if (!newPos) return;
 
                 const result = turnContext.result;
-                const isTrapped = result.trapWolf.some(e => e.id === oldEntity.id);
-                const stillExists = result.wolf.some(e => e.id === oldEntity.id);
-                const attack = result.wolfAttacks.find(a => a.wolfId === oldEntity.id);
+                const isTrapped = result.trapWolf.some(e => getEntityKey(e) === entityKey);
+                const stillExists = result.wolf.some(e => getEntityKey(e) === entityKey);
+                const attack = result.wolfAttacks.find(a => a.wolfKey === entityKey);
 
                 if (isTrapped) {
                     animations.push(
@@ -841,7 +798,7 @@
             }
 
             queueAnimation(oldEntity, turnContext, animations, floatingEntities) {
-                const newPos = turnContext.movedById.get(oldEntity.id);
+                const newPos = turnContext.movedById.get(getEntityKey(oldEntity));
                 if (!newPos) return;
 
                 animations.push(
@@ -882,17 +839,26 @@
             setTurnState(TURN_STATE.IDLE);
             hideGameModal();
 
+            let entitySequence = 0;
+            const createEntity = (id, row, col, type) => ({
+                id,
+                row,
+                col,
+                type,
+                entityKey: `${type}-${entitySequence++}`
+            });
+
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     const id = grid[r][c];
                     if (SHEEP_IDS.includes(id)) {
-                        sheepEntities.push({ id, row: r, col: c, type: ROLE_TYPE.SHEEP });
+                        sheepEntities.push(createEntity(id, r, c, ROLE_TYPE.SHEEP));
                     } else if (WOLF_IDS.includes(id)) {
-                        wolfEntities.push({ id, row: r, col: c, type: ROLE_TYPE.WOLF });
+                        wolfEntities.push(createEntity(id, r, c, ROLE_TYPE.WOLF));
                     } else if (VILLAGE_IDS.includes(id)) {
                         villageEntities.push({ id, row: r, col: c });
                     } else if (OBSTACLE_IDS.includes(id)) {
-                        obstacleEntities.push({ id, row: r, col: c, type: ROLE_TYPE.OBSTACLE });
+                        obstacleEntities.push(createEntity(id, r, c, ROLE_TYPE.OBSTACLE));
                     } else if (TRAP_IDS.includes(id)) {
                         trapEntities.push({ id, row: r, col: c });
                     }
@@ -1023,8 +989,8 @@
                 ...wolfEntities.map(e => ({ ...e })),
                 ...(isMovingObstacleLevel() ? obstacleEntities.map(e => ({ ...e })) : [])
             ];
-            const movingObstacleIds = new Set(
-                isMovingObstacleLevel() ? obstacleEntities.map(e => e.id) : []
+            const movingObstacleKeys = new Set(
+                isMovingObstacleLevel() ? obstacleEntities.map(getEntityKey) : []
             );
 
             const sorted = movingEntities.sort((a, b) => {
@@ -1062,8 +1028,8 @@
                 newSheep: sorted.filter(e => e.type === ROLE_TYPE.SHEEP).map(e => ({ ...e })),
                 newWolf: sorted.filter(e => e.type === ROLE_TYPE.WOLF).map(e => ({ ...e })),
                 newObstacles: obstacleEntities.map(obstacle => {
-                    if (!movingObstacleIds.has(obstacle.id)) return { ...obstacle };
-                    const movedObstacle = sorted.find(e => e.id === obstacle.id);
+                    if (!movingObstacleKeys.has(getEntityKey(obstacle))) return { ...obstacle };
+                    const movedObstacle = sorted.find(e => getEntityKey(e) === getEntityKey(obstacle));
                     return movedObstacle ? { ...movedObstacle } : { ...obstacle };
                 })
             };
@@ -1171,7 +1137,7 @@
                 const { newSheep, newWolf, newObstacles } = calculateMove(context.dr, context.dc);
                 context.newObstacles = newObstacles;
                 context.movedEntities = [...newSheep, ...newWolf, ...newObstacles].map(e => ({ ...e }));
-                context.movedById = new Map(context.movedEntities.map(e => [e.id, e]));
+                context.movedById = new Map(context.movedEntities.map(e => [getEntityKey(e), e]));
                 context.newSheep = newSheep;
                 context.newWolf = newWolf;
                 return TURN_STATE.CLEAR_BOARD;
@@ -1332,9 +1298,6 @@
             if (editorResizeBtn) {
                 editorResizeBtn.addEventListener('click', resizeEditorMapFromInputs);
             }
-            if (editorCopyJsonBtn) {
-                editorCopyJsonBtn.addEventListener('click', copyEditorJson);
-            }
             if (editorSaveBtn) {
                 editorSaveBtn.addEventListener('click', saveEditorLevel);
             }
@@ -1371,7 +1334,7 @@
         }
 
         async function bootGame() {
-            await loadCustomLevelMaps();
+            await loadLevelData();
             if (levelsReady) {
                 loadLevel(0);
             }

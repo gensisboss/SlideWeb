@@ -35,8 +35,12 @@
                 <strong>狼来了</strong>
             </div>
             <div class="editor-level-input">
-                <label for="editorLevelInput">关卡</label>
-                <input id="editorLevelInput" type="number" min="1" max="100" value="1">
+                <label for="editorGoalInput">逃离</label>
+                <input id="editorGoalInput" type="number" min="1" max="10" value="1">
+                <label class="editor-toggle" for="editorMoveObstacleInput">
+                    <input id="editorMoveObstacleInput" type="checkbox">
+                    <span>障碍</span>
+                </label>
             </div>
         </div>
 
@@ -61,13 +65,6 @@
 
         <div class="editor-category-tabs" id="editorCategoryTabs" aria-label="素材分类"></div>
         <div class="editor-palette" id="editorPalette" aria-label="选择放置物"></div>
-        <div class="editor-export-panel hidden" id="editorExportPanel">
-            <div class="editor-export-head">
-                <span>关卡 JSON</span>
-                <button class="editor-action-btn compact" id="editorCopyJsonBtn" type="button">复制</button>
-            </div>
-            <textarea id="editorJsonOutput" readonly spellcheck="false" aria-label="导出的关卡 JSON"></textarea>
-        </div>
         <div class="message editor-message" id="editorMessage">选择下方素材，点击地图放置</div>
     </section>
 
@@ -129,9 +126,9 @@
         </div>
     </div>
 </div>
-<script src="js/levels.js"></script>
-<script src="js/editor-core.js"></script>
-<script src="js/game.js"></script>
+<script src="js/levels.js?v=move-obstacle"></script>
+<script src="js/editor-core.js?v=move-obstacle"></script>
+<script src="js/game.js?v=move-obstacle"></script>
 
 </body>
 </html>

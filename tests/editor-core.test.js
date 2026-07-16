@@ -6,10 +6,8 @@ const {
     resizeMap,
     placeTile,
     buildLevelFromMap,
-    normalizeLevelMaps,
-    planLevelMapSave,
-    applyLevelMapSave,
-    exportLevelMapsJson
+    normalizeLevels,
+    exportLevelJson
 } = require('../js/editor-core.js');
 
 test('creates an empty map with the requested dimensions', () => {
@@ -53,68 +51,70 @@ test('resizes a map while keeping tiles still inside the new bounds', () => {
 test('builds a playable level from the editor map', () => {
     const map = createEmptyMap(2, 3);
     const edited = placeTile(placeTile(map, 0, 0, 10), 0, 2, 50);
+    const level = buildLevelFromMap(edited, 1);
 
-    assert.deepEqual(buildLevelFromMap(edited, 1), {
-        rows: 2,
-        cols: 3,
-        goal: 1,
-        note: '自定义关卡',
-        map: [
-            [10, 0, 50],
-            [0, 0, 0]
+    assert.equal(level.rows, 2);
+    assert.equal(level.cols, 3);
+    assert.equal(level.goal, 1);
+    assert.equal(level.moveObstacle, 0);
+    assert.deepEqual(level.map, [
+        [10, 0, 50],
+        [0, 0, 0]
+    ]);
+});
+
+test('normalizes level objects with explicit goals and obstacle movement settings', () => {
+    const levels = normalizeLevels({
+        levels: [
+            { goal: 2, moveObstacle: 1, map: [[10, 50], [11, 0]] },
+            { goal: 1, rows: 1, cols: 2, map: [[12, 52]] }
         ]
     });
+
+    assert.deepEqual(levels.map(level => ({
+        rows: level.rows,
+        cols: level.cols,
+        goal: level.goal,
+        moveObstacle: level.moveObstacle,
+        map: level.map
+    })), [
+        {
+            rows: 2,
+            cols: 2,
+            goal: 2,
+            moveObstacle: 1,
+            map: [[10, 50], [11, 0]]
+        },
+        {
+            rows: 1,
+            cols: 2,
+            goal: 1,
+            moveObstacle: 0,
+            map: [[12, 52]]
+        }
+    ]);
 });
 
-test('plans an overwrite when the requested level map already exists in the JSON file', () => {
-    const existing = [[10, 50]];
-    const maps = [existing];
+test('keeps old raw map arrays readable by deriving safe defaults', () => {
+    const levels = normalizeLevels([
+        [[10, 50], [11, 0]],
+        { map: [[12, 52]] }
+    ]);
 
-    assert.deepEqual(planLevelMapSave(maps, 1), {
-        action: 'overwrite',
-        targetLevelNumber: 1,
-        requiresConfirmation: true,
-        existingMap: existing
-    });
-});
-
-test('plans an append after the current JSON maximum when requested level is missing', () => {
-    const maps = [
-        [[10, 50]],
-        [[11, 51]],
+    assert.deepEqual(levels.map(level => level.goal), [2, 1]);
+    assert.deepEqual(levels.map(level => level.moveObstacle), [0, 0]);
+    assert.deepEqual(levels.map(level => level.map), [
+        [[10, 50], [11, 0]],
         [[12, 52]]
-    ];
-
-    assert.deepEqual(planLevelMapSave(maps, 10), {
-        action: 'append',
-        targetLevelNumber: 4,
-        requiresConfirmation: false,
-        existingMap: null
-    });
+    ]);
 });
 
-test('applies map saves without mutating the previous map list', () => {
-    const first = [[10, 50]];
-    const next = [[11, 0, 51]];
-    const maps = [first];
-    const updated = applyLevelMapSave(maps, 2, next);
+test('exports one editable level object for clipboard saves', () => {
+    const level = buildLevelFromMap([[10, 50], [11, 0]], 2, 1);
 
-    assert.deepEqual(maps, [first]);
-    assert.deepEqual(updated, [first, next]);
-});
-
-test('normalizes level map arrays and exports the JSON file as raw 2d arrays', () => {
-    const maps = normalizeLevelMaps([
-        [[10, 50]],
-        { map: [[11, 51]] }
-    ]);
-
-    assert.deepEqual(maps, [
-        [[10, 50]],
-        [[11, 51]]
-    ]);
-    assert.equal(exportLevelMapsJson(maps), JSON.stringify([
-        [[10, 50]],
-        [[11, 51]]
-    ], null, 2));
+    assert.equal(exportLevelJson(level), JSON.stringify({
+        goal: 2,
+        moveObstacle: 1,
+        map: [[10, 50], [11, 0]]
+    }, null, 2));
 });
