@@ -35,14 +35,21 @@
         return next;
     }
 
-    function buildLevelFromMap(map, goal = 1, moveObstacle = 0) {
+    function normalizeTitle(value) {
+        if (typeof value !== 'string') return '';
+        return value.trim();
+    }
+
+    function buildLevelFromMap(map, goal = 1, moveObstacle = 0, title = '') {
         const rows = map.length;
         const cols = rows > 0 ? map[0].length : 0;
+        const normalizedTitle = normalizeTitle(title);
         return {
             rows,
             cols,
             goal: Math.max(1, Number(goal) || 1),
             moveObstacle: normalizeMoveObstacle(moveObstacle),
+            ...(normalizedTitle ? { title: normalizedTitle } : {}),
             note: '自定义关卡',
             map: cloneMap(map)
         };
@@ -65,7 +72,12 @@
                     return buildLevelFromMap(item, countSheepInMap(item));
                 }
                 if (item && isMap(item.map)) {
-                    return buildLevelFromMap(item.map, item.goal || countSheepInMap(item.map), item.moveObstacle);
+                    return buildLevelFromMap(
+                        item.map,
+                        item.goal || countSheepInMap(item.map),
+                        item.moveObstacle,
+                        item.title
+                    );
                 }
                 return null;
             })
@@ -73,7 +85,9 @@
     }
 
     function exportLevelJson(level) {
+        const title = normalizeTitle(level?.title);
         return JSON.stringify({
+            ...(title ? { title } : {}),
             goal: Math.max(1, Number(level?.goal) || 1),
             moveObstacle: normalizeMoveObstacle(level?.moveObstacle),
             map: isMap(level?.map) ? cloneMap(level.map) : createEmptyMap()

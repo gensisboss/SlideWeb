@@ -66,12 +66,13 @@ test('builds a playable level from the editor map', () => {
 test('normalizes level objects with explicit goals and obstacle movement settings', () => {
     const levels = normalizeLevels({
         levels: [
-            { goal: 2, moveObstacle: 1, map: [[10, 50], [11, 0]] },
+            { title: '双羊借位', goal: 2, moveObstacle: 1, map: [[10, 50], [11, 0]] },
             { goal: 1, rows: 1, cols: 2, map: [[12, 52]] }
         ]
     });
 
     assert.deepEqual(levels.map(level => ({
+        title: level.title,
         rows: level.rows,
         cols: level.cols,
         goal: level.goal,
@@ -79,6 +80,7 @@ test('normalizes level objects with explicit goals and obstacle movement setting
         map: level.map
     })), [
         {
+            title: '双羊借位',
             rows: 2,
             cols: 2,
             goal: 2,
@@ -86,6 +88,7 @@ test('normalizes level objects with explicit goals and obstacle movement setting
             map: [[10, 50], [11, 0]]
         },
         {
+            title: undefined,
             rows: 1,
             cols: 2,
             goal: 1,
@@ -110,9 +113,10 @@ test('keeps old raw map arrays readable by deriving safe defaults', () => {
 });
 
 test('exports one editable level object for clipboard saves', () => {
-    const level = buildLevelFromMap([[10, 50], [11, 0]], 2, 1);
+    const level = buildLevelFromMap([[10, 50], [11, 0]], 2, 1, '木箱开路');
 
     assert.equal(exportLevelJson(level), JSON.stringify({
+        title: '木箱开路',
         goal: 2,
         moveObstacle: 1,
         map: [[10, 50], [11, 0]]

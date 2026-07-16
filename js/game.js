@@ -68,7 +68,7 @@
         const levelLoading = document.getElementById('levelLoading');
         const homeBtn = document.getElementById('homeBtn');
         const levelDisplay = document.getElementById('levelDisplay');
-        const seasonDisplay = document.getElementById('seasonDisplay');
+        const levelTitle = document.getElementById('levelTitle');
         const sheepCountSpan = document.getElementById('sheepCount');
         const wolfCountSpan = document.getElementById('wolfCount');
         const goalDisplay = document.getElementById('goalDisplay');
@@ -79,13 +79,6 @@
         const modalResetBtn = document.getElementById('modalResetBtn');
         const modalNextBtn = document.getElementById('modalNextBtn');
         const modalHomeBtn = document.getElementById('modalHomeBtn');
-
-        const SEASON_TERMS = [
-            '立春', '雨水', '惊蛰', '春分', '清明', '谷雨',
-            '立夏', '小满', '芒种', '夏至', '小暑', '大暑',
-            '立秋', '处暑', '白露', '秋分', '寒露', '霜降',
-            '立冬', '小雪', '大雪', '冬至', '小寒', '大寒'
-        ];
 
         const SPRITE_VARIANTS = {
             sheep: ['sheep.png', 'sheep-2.png', 'sheep-3.png', 'sheep-4.png', 'sheep-5.png'],
@@ -870,9 +863,12 @@
             updateUI();
             renderGrid();
             messageDisplay.textContent = '滑动棋盘，护送小羊逃进土楼';
-            levelDisplay.textContent = `第 ${index + 1} 关`;
-            if (seasonDisplay) {
-                seasonDisplay.textContent = SEASON_TERMS[index % SEASON_TERMS.length];
+            if (levelDisplay) {
+                levelDisplay.textContent = `第 ${index + 1} 关`;
+            }
+            if (levelTitle) {
+                const title = typeof config.title === 'string' ? config.title.trim() : '';
+                levelTitle.textContent = title || '护羊路线';
             }
         }
 

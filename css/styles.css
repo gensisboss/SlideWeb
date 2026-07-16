@@ -157,19 +157,8 @@ button {
         0 6px 12px rgba(45, 34, 15, 0.34);
 }
 
-.title-kicker {
-    display: inline-flex;
-    padding: 5px 16px;
-    border: 2px solid rgba(255, 248, 214, 0.88);
-    border-radius: 999px;
-    background: rgba(78, 115, 53, 0.68);
-    font-size: 0.88rem;
-    font-weight: 900;
-    letter-spacing: 0;
-}
-
 .title-lockup h1 {
-    margin-top: 12px;
+    margin-top: 0;
     font-size: clamp(3.1rem, 17vw, 5.1rem);
     line-height: 0.92;
     letter-spacing: 0;
@@ -315,6 +304,14 @@ button {
     background: rgba(245, 218, 151, 0.88);
     border: 3px solid rgba(90, 62, 26, 0.8);
     box-shadow: inset 0 -4px 0 rgba(146, 93, 42, 0.45);
+}
+
+.game-scene .top-panel {
+    grid-template-columns: 44px 1fr;
+}
+
+.game-scene .level-controls {
+    justify-self: end;
 }
 
 .editor-top-panel {
