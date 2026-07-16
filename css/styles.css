@@ -11,7 +11,7 @@
     --asset-main-bg: url("../assets/hujian-tulou/main-bg.png");
     --asset-map-bg: url("../assets/hujian-tulou/map-down-bg.png");
     --asset-cloud: url("../assets/hujian-tulou/cloud-panel.png");
-    --asset-tulou: url("../assets/hujian-tulou/tulou-main.png");
+    --asset-tulou: url("../assets/hujian-tulou/hero-main.png");
     --asset-building-square: url("../assets/hujian-tulou/building-square.png");
     --asset-building-large: url("../assets/hujian-tulou/building-large.png");
     --asset-river: url("../assets/hujian-tulou/river-tile.png");
@@ -22,6 +22,7 @@
     --asset-trap: url("../assets/hujian-tulou/trap.png");
     --asset-replay: url("../assets/hujian-tulou/button-replay.png");
     --asset-next: url("../assets/hujian-tulou/button-next.png");
+    --asset-last: url("../assets/hujian-tulou/button-last.png");
     --asset-home: url("../assets/hujian-tulou/button-home.png");
     --asset-setting: url("../assets/hujian-tulou/button-setting.png");
 }
@@ -125,7 +126,7 @@ button {
 }
 
 .start-cloud-top {
-    top: -33%;
+    top: -50%;
 }
 
 .start-cloud-bottom {
@@ -412,12 +413,11 @@ button {
 .prev-icon {
     width: 78px;
     flex-basis: 78px;
-    background-image: var(--asset-next);
-    transform: scaleX(-1);
+    background-image: var(--asset-last);
 }
 
 .prev-icon:active {
-    transform: scaleX(-1) translateY(2px);
+    transform: translateY(2px);
 }
 
 .setting-icon {
