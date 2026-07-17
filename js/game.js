@@ -52,6 +52,7 @@
         let isMoving = false;
         let isTransitioning = false;
         let turnState = TURN_STATE.IDLE;
+        let moveHistory = [];
 
         const gridContainer = document.getElementById('gridContainer');
         const startScreen = document.getElementById('startScreen');
@@ -59,6 +60,9 @@
         const openEditorBtn = document.getElementById('openEditorBtn');
         const gameScene = document.getElementById('gameScene');
         const editorScene = document.getElementById('editorScene');
+        const prevLevelBtn = document.getElementById('prevLevelBtn');
+        const nextLevelBtn = document.getElementById('nextLevelBtn');
+        const undoStepBtn = document.getElementById('undoStepBtn');
         const editorGrid = document.getElementById('editorGrid');
         const editorCategoryTabs = document.getElementById('editorCategoryTabs');
         const editorPalette = document.getElementById('editorPalette');
@@ -443,6 +447,173 @@
             if (startScreen) startScreen.classList.add('is-hidden');
             if (gameScene) gameScene.classList.remove('is-hidden');
             if (editorScene) editorScene.classList.add('is-hidden');
+            updateLevelNavUI();
+        }
+
+        function isPlaytestMode() {
+            return !progressTracking;
+        }
+
+        function cloneEntityList(list) {
+            return (list || []).map(entity => ({ ...entity }));
+        }
+
+        function clearMoveHistory() {
+            moveHistory = [];
+            updateUndoButtonState();
+        }
+
+        function capturePlaytestSnapshot() {
+            return {
+                sheepEntities: cloneEntityList(sheepEntities),
+                wolfEntities: cloneEntityList(wolfEntities),
+                obstacleEntities: cloneEntityList(obstacleEntities),
+                trapEntities: cloneEntityList(trapEntities),
+                escapedSheep,
+                sheepCount,
+                wolfCount
+            };
+        }
+
+        function pushPlaytestSnapshot() {
+            if (!isPlaytestMode()) return;
+            moveHistory.push(capturePlaytestSnapshot());
+            updateUndoButtonState();
+        }
+
+        function updateUndoButtonState() {
+            if (!undoStepBtn) return;
+            const canUndo = isPlaytestMode()
+                && !gameOver
+                && !isMoving
+                && !isTransitioning
+                && moveHistory.length > 0;
+            undoStepBtn.disabled = !canUndo;
+            undoStepBtn.classList.toggle('is-disabled', !canUndo);
+        }
+
+        function updateLevelNavUI() {
+            const playtest = isPlaytestMode();
+            if (prevLevelBtn) prevLevelBtn.classList.toggle('is-hidden', playtest);
+            if (nextLevelBtn) nextLevelBtn.classList.toggle('is-hidden', playtest);
+            if (undoStepBtn) undoStepBtn.classList.toggle('is-hidden', !playtest);
+            updateUndoButtonState();
+        }
+
+        function getMovingEntitiesForUndo(snapshot) {
+            const includeObstacles = isMovingObstacleLevel();
+            return {
+                current: [
+                    ...sheepEntities,
+                    ...wolfEntities,
+                    ...(includeObstacles ? obstacleEntities : [])
+                ],
+                target: [
+                    ...(snapshot.sheepEntities || []),
+                    ...(snapshot.wolfEntities || []),
+                    ...(includeObstacles ? (snapshot.obstacleEntities || []) : [])
+                ]
+            };
+        }
+
+        function animateFadeEntity(row, col, emoji, className, id, duration = 280) {
+            return new Promise(resolve => {
+                const pos = getCellPixelPosition(row, col);
+                const el = document.createElement('div');
+                el.className = `floating-entity ${getFloatingClassForEmoji(emoji)} ${className}`;
+                el.textContent = emoji;
+                applySpriteStyle(el, id);
+                el.style.left = `${pos.left}px`;
+                el.style.top = `${pos.top}px`;
+                const sample = document.querySelector('.cell .emoji');
+                if (sample) {
+                    el.style.fontSize = getComputedStyle(sample).fontSize;
+                }
+                gridContainer.appendChild(el);
+                setTimeout(() => {
+                    el.remove();
+                    resolve();
+                }, duration);
+            });
+        }
+
+        async function undoLastMove() {
+            if (!isPlaytestMode() || gameOver || isMoving || isTransitioning || moveHistory.length === 0) {
+                return;
+            }
+
+            const snapshot = moveHistory.pop();
+            setTurnState(TURN_STATE.ANIMATE);
+            updateUndoButtonState();
+
+            const { current, target } = getMovingEntitiesForUndo(snapshot);
+            const currentByKey = new Map(current.map(entity => [getEntityKey(entity), entity]));
+            const targetByKey = new Map(target.map(entity => [getEntityKey(entity), entity]));
+            const animations = [];
+
+            trapEntities = cloneEntityList(snapshot.trapEntities);
+            applyStaticState({ includeObstacles: !isMovingObstacleLevel() });
+
+            for (const [key, fromEntity] of currentByKey) {
+                const toEntity = targetByKey.get(key);
+                if (toEntity && fromEntity.row === toEntity.row && fromEntity.col === toEntity.col) {
+                    grid[toEntity.row][toEntity.col] = toEntity.id;
+                }
+            }
+            renderGrid();
+
+            for (const [key, fromEntity] of currentByKey) {
+                const toEntity = targetByKey.get(key);
+                const emoji = getEmojiForId(fromEntity.id);
+                if (toEntity) {
+                    if (fromEntity.row !== toEntity.row || fromEntity.col !== toEntity.col) {
+                        animations.push(
+                            animateEntity(
+                                fromEntity.row,
+                                fromEntity.col,
+                                toEntity.row,
+                                toEntity.col,
+                                emoji,
+                                350,
+                                { id: fromEntity.id }
+                            )
+                        );
+                    }
+                } else {
+                    animations.push(
+                        animateFadeEntity(fromEntity.row, fromEntity.col, emoji, 'undo-fade-out', fromEntity.id)
+                    );
+                }
+            }
+
+            for (const [key, toEntity] of targetByKey) {
+                if (currentByKey.has(key)) continue;
+                animations.push(
+                    animateFadeEntity(
+                        toEntity.row,
+                        toEntity.col,
+                        getEmojiForId(toEntity.id),
+                        'undo-fade-in',
+                        toEntity.id
+                    )
+                );
+            }
+
+            await Promise.all(animations);
+
+            sheepEntities = cloneEntityList(snapshot.sheepEntities);
+            wolfEntities = cloneEntityList(snapshot.wolfEntities);
+            obstacleEntities = cloneEntityList(snapshot.obstacleEntities);
+            trapEntities = cloneEntityList(snapshot.trapEntities);
+            escapedSheep = snapshot.escapedSheep;
+            sheepCount = snapshot.sheepCount;
+            wolfCount = snapshot.wolfCount;
+            applyFinalState();
+            renderGrid();
+            updateUI();
+            messageDisplay.textContent = '已返回上一步';
+            setTurnState(TURN_STATE.IDLE);
+            updateUndoButtonState();
         }
 
         function showEditorScene() {
@@ -544,8 +715,10 @@
             LEVEL_CONFIGS.push(...levelConfigs);
             levelsReady = levelConfigs.length > 0;
             progressTracking = true;
+            clearMoveHistory();
             clampLevelProgress();
             currentLevel = levelsReady ? Math.min(currentLevel, levelConfigs.length - 1) : 0;
+            updateLevelNavUI();
             return levelsReady;
         }
 
@@ -724,6 +897,7 @@
             LEVEL_CONFIGS.push(level);
             levelsReady = true;
             progressTracking = false;
+            clearMoveHistory();
             await transitionToLevel(0);
             showGameScene();
         }
@@ -1059,6 +1233,7 @@
             
             sheepCount = sheepEntities.length;
             wolfCount = wolfEntities.length;
+            clearMoveHistory();
             updateUI();
             renderGrid();
             messageDisplay.textContent = '滑动屏幕，护送小羊逃进羊村';
@@ -1069,6 +1244,7 @@
                 const title = typeof config.title === 'string' ? config.title.trim() : '';
                 levelTitle.textContent = title;
             }
+            updateLevelNavUI();
         }
 
         // ========== 渲染网格 ==========
@@ -1398,6 +1574,7 @@
                     messageDisplay.textContent = `小羊和野狼向${getDirectionLabel(context.direction)}滑动`;
                 }
 
+                updateUndoButtonState();
                 return TURN_STATE.IDLE;
             }
         };
@@ -1412,11 +1589,13 @@
             }
 
             setTurnState(TURN_STATE.IDLE);
+            updateUndoButtonState();
         }
 
         // ========== 移动逻辑 ==========
         async function moveAll(direction) {
             if (gameOver || isMoving || guideActive) return;
+            pushPlaytestSnapshot();
             await runTurnStateMachine(createTurnContext(direction));
         }
 
@@ -1521,24 +1700,31 @@
             if (modalResetBtn) {
                 modalResetBtn.addEventListener('click', handleModalReset);
             }
-            document.getElementById('prevLevelBtn').addEventListener('click', async () => {
-                if (guideActive || isMoving || isTransitioning) return;
-                if (currentLevel > 0) {
-                    await transitionToLevel(currentLevel - 1);
-                } else if (currentLevel === 0) {
-                    messageDisplay.textContent = '已经是第一关';
-                }
-            });
-            document.getElementById('nextLevelBtn').addEventListener('click', async () => {
-                if (guideActive || isMoving || isTransitioning) return;
-                if (canSkipToNextLevel()) {
-                    await transitionToLevel(currentLevel + 1);
-                } else if (currentLevel >= LEVEL_CONFIGS.length - 1) {
-                    messageDisplay.textContent = '狼来了已经走到终章';
-                } else {
-                    messageDisplay.textContent = '请先通关当前关卡，才能进入下一关';
-                }
-            });
+            if (undoStepBtn) {
+                undoStepBtn.addEventListener('click', undoLastMove);
+            }
+            if (prevLevelBtn) {
+                prevLevelBtn.addEventListener('click', async () => {
+                    if (guideActive || isMoving || isTransitioning) return;
+                    if (currentLevel > 0) {
+                        await transitionToLevel(currentLevel - 1);
+                    } else if (currentLevel === 0) {
+                        messageDisplay.textContent = '已经是第一关';
+                    }
+                });
+            }
+            if (nextLevelBtn) {
+                nextLevelBtn.addEventListener('click', async () => {
+                    if (guideActive || isMoving || isTransitioning) return;
+                    if (canSkipToNextLevel()) {
+                        await transitionToLevel(currentLevel + 1);
+                    } else if (currentLevel >= LEVEL_CONFIGS.length - 1) {
+                        messageDisplay.textContent = '狼来了已经走到终章';
+                    } else {
+                        messageDisplay.textContent = '请先通关当前关卡，才能进入下一关';
+                    }
+                });
+            }
         }
 
         async function bootGame() {

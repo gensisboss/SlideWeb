@@ -23,6 +23,7 @@
     --asset-replay: url("../assets/hujian-tulou/button-replay.png");
     --asset-next: url("../assets/hujian-tulou/button-next.png");
     --asset-last: url("../assets/hujian-tulou/button-last.png");
+    --asset-undo: url("../assets/hujian-tulou/button-undo.png");
     --asset-home: url("../assets/hujian-tulou/button-home.png");
     --asset-setting: url("../assets/hujian-tulou/button-setting.png");
 }
@@ -408,16 +409,51 @@ button {
     width: 78px;
     flex-basis: 78px;
     background-image: var(--asset-next);
+    background-size: 100% 100%;
 }
 
 .prev-icon {
     width: 78px;
     flex-basis: 78px;
     background-image: var(--asset-last);
+    background-size: 100% 100%;
 }
 
-.prev-icon:active {
+.undo-icon {
+    width: 78px;
+    flex-basis: 78px;
+    background-image: var(--asset-undo);
+    background-size: 100% 100%;
+}
+
+.prev-icon:active,
+.next-icon:active,
+.undo-icon:active {
     transform: translateY(2px);
+}
+
+.round-btn:disabled,
+.round-btn.is-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+}
+
+.floating-entity.undo-fade-in {
+    animation: undoFadeIn 0.28s ease forwards;
+}
+
+.floating-entity.undo-fade-out {
+    animation: undoFadeOut 0.28s ease forwards;
+}
+
+@keyframes undoFadeIn {
+    from { opacity: 0; transform: scale(0.85); }
+    to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes undoFadeOut {
+    from { opacity: 1; transform: scale(1); }
+    to { opacity: 0; transform: scale(0.85); }
 }
 
 .setting-icon {
@@ -1064,7 +1100,8 @@ button {
     }
 
     .next-icon,
-    .prev-icon {
+    .prev-icon,
+    .undo-icon {
         width: 64px;
         flex-basis: 64px;
     }
