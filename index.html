@@ -121,9 +121,20 @@
         </div>
     </div>
 </div>
-<script src="js/levels.js?v=move-obstacle"></script>
-<script src="js/editor-core.js?v=move-obstacle"></script>
-<script src="js/game.js?v=move-obstacle"></script>
+<div class="guide-overlay hidden" id="guideOverlay" aria-hidden="true">
+    <div class="guide-spotlight" id="guideSpotlight"></div>
+    <div class="guide-dialog" id="guideDialog">
+        <img class="guide-portrait" src="assets/hujian-tulou/guide-grandpa.png" alt="牧羊老爷爷">
+        <p class="guide-text" id="guideText"></p>
+        <div class="guide-stars" aria-hidden="true">
+            <span></span><span></span>
+        </div>
+        <span class="guide-hint">点击继续</span>
+    </div>
+</div>
+<script src="js/levels.js?v=guide"></script>
+<script src="js/editor-core.js?v=guide"></script>
+<script src="js/game.js?v=guide"></script>
 
 </body>
 </html>

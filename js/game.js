@@ -31,7 +31,11 @@
         let currentLevel = 0;
         let maxUnlockedLevel = 0;
         let progressTracking = true;
-        const PROGRESS_STORAGE_KEY = 'slideweb-max-unlocked-level';
+        let guideActive = false;
+        let guideConfigs = [];
+        let guideLineIndex = 0;
+        let activeGuide = null;
+        let seenGuideLevels = new Set();
         let grid = [];
         let ROWS = 6;
         let COLS = 6;
@@ -82,7 +86,9 @@
         const modalResetBtn = document.getElementById('modalResetBtn');
         const modalNextBtn = document.getElementById('modalNextBtn');
         const modalHomeBtn = document.getElementById('modalHomeBtn');
-
+        const guideOverlay = document.getElementById('guideOverlay');
+        const guideSpotlight = document.getElementById('guideSpotlight');
+        const guideText = document.getElementById('guideText');
         const SPRITE_VARIANTS = {
             sheep: ['sheep.png', 'sheep-2.png', 'sheep-3.png', 'sheep-4.png', 'sheep-5.png'],
             wolf: ['wolf.png', 'wolf-2.png', 'wolf-3.png', 'wolf-4.png', 'wolf-5.png'],
@@ -93,6 +99,9 @@
 
         const SPRITE_BASE = 'assets/hujian-tulou/';
         const LEVELS_URL = 'data/level.json';
+        const GUIDE_URL = 'data/guide.json';
+        const PROGRESS_STORAGE_KEY = 'slideweb-max-unlocked-level';
+        const GUIDE_SEEN_STORAGE_KEY = 'slideweb-guide-seen-levels';
         const DEFAULT_EDITOR_ROWS = 6;
         const DEFAULT_EDITOR_COLS = 6;
         const MIN_EDITOR_SIZE = 1;
@@ -178,6 +187,17 @@
             } catch {
                 maxUnlockedLevel = 0;
             }
+            try {
+                const seenRaw = localStorage.getItem(GUIDE_SEEN_STORAGE_KEY);
+                const seenList = seenRaw ? JSON.parse(seenRaw) : [];
+                seenGuideLevels = new Set(
+                    Array.isArray(seenList)
+                        ? seenList.filter(n => Number.isFinite(Number(n))).map(n => Math.floor(Number(n)))
+                        : []
+                );
+            } catch {
+                seenGuideLevels = new Set();
+            }
         }
 
         function saveLevelProgress() {
@@ -186,6 +206,133 @@
             } catch {
                 // ignore quota / private mode failures
             }
+        }
+
+        function saveGuideSeen() {
+            try {
+                localStorage.setItem(GUIDE_SEEN_STORAGE_KEY, JSON.stringify([...seenGuideLevels]));
+            } catch {
+                // ignore quota / private mode failures
+            }
+        }
+
+        function normalizeGuideConfigs(source) {
+            const list = source && Array.isArray(source.guides) ? source.guides : [];
+            return list
+                .map(item => {
+                    if (!item || typeof item !== 'object') return null;
+                    const level = Math.floor(Number(item.level));
+                    const lines = Array.isArray(item.lines)
+                        ? item.lines.map(line => String(line || '').trim()).filter(Boolean)
+                        : [];
+                    const row = Math.floor(Number(item.highlight?.row));
+                    const col = Math.floor(Number(item.highlight?.col));
+                    if (!Number.isFinite(level) || level < 1 || lines.length === 0) return null;
+                    if (!Number.isFinite(row) || !Number.isFinite(col) || row < 0 || col < 0) return null;
+                    return { level, lines, highlight: { row, col } };
+                })
+                .filter(Boolean);
+        }
+
+        async function loadGuideData() {
+            try {
+                const response = await fetch(`${GUIDE_URL}?t=${Date.now()}`, { cache: 'no-store' });
+                if (!response.ok) {
+                    guideConfigs = [];
+                    return;
+                }
+                guideConfigs = normalizeGuideConfigs(await response.json());
+            } catch {
+                guideConfigs = [];
+            }
+        }
+
+        function getGuideForLevel(levelIndex) {
+            const levelNumber = levelIndex + 1;
+            return guideConfigs.find(guide => guide.level === levelNumber) || null;
+        }
+
+        function hideGuideOverlay() {
+            guideActive = false;
+            activeGuide = null;
+            guideLineIndex = 0;
+            if (guideOverlay) {
+                guideOverlay.classList.add('hidden');
+                guideOverlay.setAttribute('aria-hidden', 'true');
+            }
+            if (guideSpotlight) {
+                guideSpotlight.style.left = '0px';
+                guideSpotlight.style.top = '0px';
+                guideSpotlight.style.width = '0px';
+                guideSpotlight.style.height = '0px';
+            }
+        }
+
+        function positionGuideSpotlight(row, col) {
+            if (!guideSpotlight) return;
+            const cell = getCellElement(row, col);
+            if (!cell) {
+                guideSpotlight.style.width = '0px';
+                guideSpotlight.style.height = '0px';
+                return;
+            }
+            const rect = cell.getBoundingClientRect();
+            const pad = 4;
+            guideSpotlight.style.left = `${rect.left - pad}px`;
+            guideSpotlight.style.top = `${rect.top - pad}px`;
+            guideSpotlight.style.width = `${rect.width + pad * 2}px`;
+            guideSpotlight.style.height = `${rect.height + pad * 2}px`;
+        }
+
+        function renderGuideLine() {
+            if (!activeGuide || !guideText) return;
+            guideText.textContent = activeGuide.lines[guideLineIndex] || '';
+        }
+
+        function markGuideSeen(levelNumber) {
+            if (seenGuideLevels.has(levelNumber)) return;
+            seenGuideLevels.add(levelNumber);
+            saveGuideSeen();
+        }
+
+        function closeGuide() {
+            if (activeGuide) {
+                markGuideSeen(activeGuide.level);
+            }
+            hideGuideOverlay();
+        }
+
+        function advanceGuide() {
+            if (!guideActive || !activeGuide) return;
+            if (guideLineIndex < activeGuide.lines.length - 1) {
+                guideLineIndex += 1;
+                renderGuideLine();
+                return;
+            }
+            closeGuide();
+        }
+
+        function maybeShowGuideForCurrentLevel() {
+            hideGuideOverlay();
+            if (!progressTracking || !guideOverlay) return;
+            const guide = getGuideForLevel(currentLevel);
+            if (!guide || seenGuideLevels.has(guide.level)) return;
+            if (
+                guide.highlight.row >= ROWS ||
+                guide.highlight.col >= COLS
+            ) {
+                return;
+            }
+
+            activeGuide = guide;
+            guideLineIndex = 0;
+            guideActive = true;
+            renderGuideLine();
+            guideOverlay.classList.remove('hidden');
+            guideOverlay.setAttribute('aria-hidden', 'false');
+            requestAnimationFrame(() => {
+                positionGuideSpotlight(guide.highlight.row, guide.highlight.col);
+            });
         }
 
         function clampLevelProgress() {
@@ -321,6 +468,7 @@
 
         function goHome() {
             if (isMoving || isTransitioning) return;
+            hideGuideOverlay();
             currentLevel = 0;
             if (levelsReady && LEVEL_CONFIGS.length) {
                 loadLevel(currentLevel);
@@ -342,7 +490,7 @@
         }
 
         async function goNextLevel() {
-            if (isMoving || isTransitioning) return;
+            if (isMoving || isTransitioning || guideActive) return;
             if (canSkipToNextLevel()) {
                 showGameScene();
                 await transitionToLevel(currentLevel + 1);
@@ -380,12 +528,14 @@
             isTransitioning = true;
             setTurnState(TURN_STATE.ANIMATE);
             hideGameModal();
+            hideGuideOverlay();
             await playLevelLoading(() => {
                 currentLevel = index;
                 loadLevel(currentLevel);
             });
             setTurnState(TURN_STATE.IDLE);
             isTransitioning = false;
+            maybeShowGuideForCurrentLevel();
         }
 
         function applyLevels(source) {
@@ -1266,13 +1416,13 @@
 
         // ========== 移动逻辑 ==========
         async function moveAll(direction) {
-            if (gameOver || isMoving) return;
+            if (gameOver || isMoving || guideActive) return;
             await runTurnStateMachine(createTurnContext(direction));
         }
 
         // ========== 重置关卡 ==========
         async function resetLevel() {
-            if (isMoving || isTransitioning) return;
+            if (isMoving || isTransitioning || guideActive) return;
             await transitionToLevel(currentLevel);
         }
 
@@ -1281,7 +1431,7 @@
         let isDragging = false;
 
         function handleSwipeStart(e) {
-            if (gameOver || isMoving || isTransitioning) return;
+            if (gameOver || isMoving || isTransitioning || guideActive) return;
             const t = e.touches ? e.touches[0] : e;
             touchStartX = t.clientX;
             touchStartY = t.clientY;
@@ -1289,7 +1439,7 @@
         }
 
         function handleSwipeEnd(e) {
-            if (!isDragging || gameOver || isMoving || isTransitioning) {
+            if (!isDragging || gameOver || isMoving || isTransitioning || guideActive) {
                 isDragging = false;
                 return;
             }
@@ -1359,19 +1509,28 @@
             if (modalNextBtn) {
                 modalNextBtn.addEventListener('click', goNextLevel);
             }
+            if (guideOverlay) {
+                guideOverlay.addEventListener('click', advanceGuide);
+            }
+            window.addEventListener('resize', () => {
+                if (guideActive && activeGuide) {
+                    positionGuideSpotlight(activeGuide.highlight.row, activeGuide.highlight.col);
+                }
+            });
             document.getElementById('resetBtn').addEventListener('click', resetLevel);
             if (modalResetBtn) {
                 modalResetBtn.addEventListener('click', handleModalReset);
             }
             document.getElementById('prevLevelBtn').addEventListener('click', async () => {
-                if (currentLevel > 0 && !isMoving && !isTransitioning) {
+                if (guideActive || isMoving || isTransitioning) return;
+                if (currentLevel > 0) {
                     await transitionToLevel(currentLevel - 1);
                 } else if (currentLevel === 0) {
                     messageDisplay.textContent = '已经是第一关';
                 }
             });
             document.getElementById('nextLevelBtn').addEventListener('click', async () => {
-                if (isMoving || isTransitioning) return;
+                if (guideActive || isMoving || isTransitioning) return;
                 if (canSkipToNextLevel()) {
                     await transitionToLevel(currentLevel + 1);
                 } else if (currentLevel >= LEVEL_CONFIGS.length - 1) {
@@ -1384,7 +1543,7 @@
 
         async function bootGame() {
             loadLevelProgress();
-            await loadLevelData();
+            await Promise.all([loadLevelData(), loadGuideData()]);
             if (levelsReady) {
                 currentLevel = Math.min(currentLevel, maxUnlockedLevel);
                 loadLevel(currentLevel);
